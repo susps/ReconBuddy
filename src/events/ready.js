@@ -9,6 +9,7 @@ export async function execute(client) {
   console.log(`[READY] Logged in as ${client.user.tag} (${client.user.id})`);
   console.log(`[READY] Serving ${client.guilds.cache.size} guilds • ${client.users.cache.size} users`);
 
-const { startStatusRotation } = require('../utils/statusRotator.js');
+  const { startStatusRotation } = await import('../utils/statusRotator.js');
+
   startStatusRotation(client);
 }
