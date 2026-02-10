@@ -1,0 +1,9 @@
+{
+  "enabled": true,
+  "verifiedRoleId": "1470150436358193234",
+  "selfRoles": [
+    { "id": "1470153174391455756", "label": "Gamer", "emoji": "🎮" },
+    { "id": "1470153198298857754", "label": "Artist", "emoji": "🎨" }
+  ],
+  "channelId": "1470351294534258852"
+}

@@ -1,0 +1,34 @@
+{
+  "name": "nexi",
+  "version": "2.0.0",
+  "type": "module",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "lint": "eslint . --ext .js",
+    "format": "prettier --write .",
+    "deploy": "node scripts/deployCommands.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@discordjs/builders": "^1.13.1",
+    "@discordjs/rest": "^0.4.1",
+    "@napi-rs/canvas": "^0.1.90",
+    "canvas": "^3.2.1",
+    "discord-api-types": "^0.38.38",
+    "discord.js": "^14.25.1",
+    "dotenv": "^17.2.4",
+    "mongodb": "^7.1.0"
+  },
+  "devDependencies": {
+    "eslint": "^10.0.0",
+    "nodemon": "^3.1.11",
+    "prettier": "^3.8.1"
+  }
+}

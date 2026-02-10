@@ -1,0 +1,88 @@
+# .gitignore for NEXI Discord bot project
+
+# Node.js / npm / Yarn / pnpm
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+.pnpm-debug.log
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Environment variables & secrets
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Build / dist / output
+dist/
+build/
+out/
+coverage/
+
+# Editor & OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.swn
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
+*~
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Database backups / dumps (if you ever create them locally)
+*.dump
+*.sql
+*.sqlite
+*.sqlite3
+
+# Canvas / image generation temp files (if you generate locally)
+temp-images/
+canvas-cache/
+*.png.tmp
+*.jpg.tmp
+
+# MongoDB / database local files (if you ever use local Mongo)
+data/db/
+mongod.lock
+
+# Testing artifacts
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Deployment / CI files (add if needed later)
+.vercel
+.now/
+netlify.toml
+railway.json
+
+# Keep these (examples / templates)
+!.env.example
+!.gitignore
+!README.md
+!LICENSE

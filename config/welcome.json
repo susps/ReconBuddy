@@ -1,0 +1,24 @@
+{
+  "enabled": true,
+  "channelId": "1470150061349666980",
+  "message": "Welcome {user} to {server}!",
+  "backgroundUrl": "https://i.pinimg.com/originals/32/d3/e1/32d3e1965bb1ae38f930d41881b4a060.gif",
+  "verifiedRoleId": "1470150436358193234",
+  "selfRoles": [
+    {
+      "id": "1470153174391455756",
+      "label": "Gamer Role",
+      "emoji": "🎮"
+    },
+    {
+      "id": "1470153198298857754",
+      "label": "Artist Role",
+      "emoji": "🖌️"
+    },
+    {
+      "id": "1470153971627986955",
+      "label": "The Bot Role!",
+      "emoji": "🤖"
+    }
+  ]
+}

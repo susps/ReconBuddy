@@ -1,0 +1,27 @@
+{
+  "messageDelete": {
+    "channelId": "1432798364063236258",
+    "format": "[{timestamp}] {event}: {json}",
+    "filters": {},
+    "enabled": true
+  },
+  "messageCreate": {
+    "channelId": "1470141154799386727",
+    "format": "[{timestamp}] {event}: {json}",
+    "filters": {
+      "contains": {
+        "type": "contains",
+        "addedAt": "2026-02-08T19:37:09.469Z"
+      },
+      "emoji": {
+        "type": "emoji",
+        "addedAt": "2026-02-08T19:36:58.040Z"
+      },
+      "user": {
+        "type": "user",
+        "addedAt": "2026-02-08T19:37:05.499Z"
+      }
+    },
+    "enabled": true
+  }
+}
