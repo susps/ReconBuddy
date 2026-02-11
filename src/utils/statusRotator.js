@@ -20,29 +20,27 @@ export function startStatusRotation(client) {
   let currentIndex = 0;
 
   const updateStatus = () => {
-    const status = statusList[currentIndex];
+    const status_list = statusList[currentIndex];
 
     // Replace placeholders
-    let name = status.name;
+    let name = status_list.name;
     if (name.includes('{serverCount}')) {
       name = name.replace('{serverCount}', client.guilds.cache.size.toString());
     }
 
     client.user.setPresence({
-      status: 'online',
+      status: 'dnd',
       activities: [
         {
           name,
-          type: status.type,
+          type: status_list.type,
         },
       ],
     });
 
-    // Move to next status
     currentIndex = (currentIndex + 1) % statusList.length;
   };
 
-  // Update immediately on start
   updateStatus();
 
   // Rotate every 5 minutes (300000 ms)
