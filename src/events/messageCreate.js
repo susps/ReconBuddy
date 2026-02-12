@@ -9,6 +9,12 @@ export const once = false;
 export async function execute(message, client) {
   if (message.author.bot || !message.guild) return;
 
+  const actionTaken = checkMessageRateLimit(message);
+
+  if (actionTaken) {
+    console.log(`Anti-spam action taken on ${message.author.tag} in ${message.guild.name}`);
+  }
+
   // Load listener config
   const listenersFile = path.join(process.cwd(), 'listeners.json');
   if (!fs.existsSync(listenersFile)) return;

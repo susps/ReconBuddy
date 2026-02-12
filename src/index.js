@@ -5,11 +5,21 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-// discord.js – default import + direct access (the only stable ESM pattern for v14)
+// ─────────────────────────────────────────────────────────────────────────────
+// discord.js – default import + direct access (stable ESM pattern)
+// ─────────────────────────────────────────────────────────────────────────────
 import discord from 'discord.js';
 
 import { MongoClient, ServerApiVersion } from 'mongodb';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Logger (structured logging)
+// ─────────────────────────────────────────────────────────────────────────────
+import { log } from './utils/logger.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Component loader
+// ─────────────────────────────────────────────────────────────────────────────
 import { loadComponents } from './handlers/componentHandler.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -21,7 +31,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TOKEN = process.env.DISCORD_TOKEN?.trim();
 
 if (!TOKEN) {
-  console.error('DISCORD_TOKEN is missing or empty in .env');
+  log.error('DISCORD_TOKEN is missing or empty in .env');
   process.exit(1);
 }
 
@@ -33,7 +43,6 @@ const client = new discord.Client({
   intents: [
     discord.IntentsBitField.Flags.Guilds,
     discord.IntentsBitField.Flags.GuildMembers,
-    discord.IntentsBitField.Flags.GuildPresences,
     discord.IntentsBitField.Flags.GuildVoiceStates,
     discord.IntentsBitField.Flags.GuildMessages,
     discord.IntentsBitField.Flags.MessageContent,
@@ -71,21 +80,21 @@ async function loadEvents() {
       const event = await import(fileUrl);
 
       if (!event?.name || typeof event.execute !== 'function') {
-        console.warn(`Invalid event file: ${file}`);
+        log.warn(`Invalid event file: ${file}`);
         continue;
       }
 
       const register = event.once ? client.once : client.on;
       register.call(client, event.name, (...args) => event.execute(...args, client));
 
-      console.log(`[EVENT] Loaded → ${event.name}${event.once ? ' (once)' : ''}`);
+      log.info(`[EVENT] Loaded → ${event.name}${event.once ? ' (once)' : ''}`);
       count++;
     }
   } catch (err) {
     if (err.code === 'ENOENT') {
-      console.warn('events/ directory not found – skipping');
+      log.warn('events/ directory not found – skipping');
     } else {
-      console.error('Failed to load events:', err.message);
+      log.error('Failed to load events:', err.message);
     }
   }
 
@@ -98,7 +107,7 @@ async function loadCommands() {
 
   try {
     const items = await fs.readdir(commandsDir);
-    console.log(`DEBUG: Raw items in commands/: ${items.join(', ')}`);
+    log.debug(`Raw items in commands/: ${items.join(', ')}`);
 
     const categories = [];
 
@@ -108,9 +117,9 @@ async function loadCommands() {
 
       if (stat.isDirectory()) {
         categories.push(item);
-        console.log(`DEBUG: Directory found: ${item}`);
+        log.debug(`Directory found: ${item}`);
       } else {
-        console.log(`DEBUG: File skipped (not directory): ${item}`);
+        log.debug(`File skipped (not directory): ${item}`);
       }
     }
 
@@ -118,7 +127,7 @@ async function loadCommands() {
       const catPath = path.join(commandsDir, category);
       const files = (await fs.readdir(catPath)).filter(f => f.endsWith('.js') || f.endsWith('.mjs'));
 
-      console.log(`DEBUG: Category "${category}" has files: ${files.join(', ') || '(empty)'}`);
+      log.debug(`Category "${category}" has files: ${files.join(', ') || '(empty)'}`);
 
       for (const file of files) {
         const filePath = path.join(catPath, file);
@@ -128,20 +137,20 @@ async function loadCommands() {
           const command = await import(fileUrl);
 
           if (!command?.data?.name || typeof command.execute !== 'function') {
-            console.warn(`Invalid command: ${path.join(category, file)}`);
+            log.warn(`Invalid command: ${path.join(category, file)}`);
             continue;
           }
 
           client.commands.set(command.data.name, command);
-          console.log(`[CMD] Loaded → /${command.data.name} (${category})`);
+          log.info(`[CMD] Loaded → /${command.data.name} (${category})`);
           count++;
         } catch (err) {
-          console.error(`Failed to load ${path.join(category, file)}: ${err.message}`);
+          log.error(`Failed to load ${path.join(category, file)}: ${err.message}`);
         }
       }
     }
   } catch (err) {
-    console.error('Failed to load commands folder:', err);
+    log.error('Failed to load commands folder:', err.message);
   }
 
   return count;
@@ -155,7 +164,7 @@ async function initDatabase() {
   const MONGODB_URI = process.env.MONGODB_URI?.trim();
 
   if (!MONGODB_URI) {
-    console.warn('No MONGODB_URI provided – database disabled');
+    log.warn('No MONGODB_URI provided – database disabled');
     return;
   }
 
@@ -172,9 +181,9 @@ async function initDatabase() {
     await mongo.db().command({ ping: 1 });
 
     client.db = mongo.db();
-    console.log('MongoDB connected');
+    log.info('MongoDB connected');
   } catch (err) {
-    console.error('MongoDB connection failed:', err.message);
+    log.error('MongoDB connection failed:', err.message);
     client.db = null;
   }
 }
@@ -184,7 +193,7 @@ async function initDatabase() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function bootstrap() {
-  console.log('Starting bot...');
+  log.info('Starting bot...');
 
   const eventsLoaded = await loadEvents();
   const commandsLoaded = await loadCommands();
@@ -193,10 +202,14 @@ async function bootstrap() {
 
   await loadComponents(client);
 
-  console.log(`\nReady: ${eventsLoaded} events • ${commandsLoaded} commands`);
+  log.info(`Ready: ${eventsLoaded} events • ${commandsLoaded} commands`);
+
+  // Start status rotation (after login)
+  const { startStatusRotation } = await import('./utils/statusRotator.js');
+  startStatusRotation(client);
 
   client.login(TOKEN).catch(err => {
-    console.error('Login failed:', err.message);
+    log.err(err, 'Login failed');
     process.exit(1);
   });
 }
@@ -206,11 +219,11 @@ async function bootstrap() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('[Unhandled Rejection]', promise, reason);
+  log.err(reason, 'Unhandled Rejection');
 });
 
 process.on('uncaughtException', err => {
-  console.error('[Uncaught Exception]', err);
+  log.err(err, 'Uncaught Exception');
   process.exit(1);
 });
 
@@ -219,6 +232,6 @@ process.on('uncaughtException', err => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 bootstrap().catch(err => {
-  console.error('Bootstrap failed:', err.message);
+  log.err(err, 'Bootstrap failed');
   process.exit(1);
 });

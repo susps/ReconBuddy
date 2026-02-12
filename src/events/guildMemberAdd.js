@@ -1,6 +1,7 @@
 import { Events } from 'discord.js';
 import { generateWelcomeImage, sendWelcomeDM } from '../services/welcome.js';
 import { loadWelcomeConfig } from '../services/welcome.js';
+import { checkJoinRateLimit } from '../services/antiSpam.js';
 
 export const name = Events.GuildMemberAdd;
 export const once = false;
@@ -8,7 +9,13 @@ export const once = false;
 export async function execute(member, client) {
   const config = await loadWelcomeConfig();
   if (!config.enabled) return;
+  if (!member.guild) return;
 
+  const actionTaken = checkJoinRateLimit(member.guild.id, member);
+
+  if (actionTaken) {
+    console.log(`Anti-raid action taken on ${member.user.tag} in ${member.guild.name}`);
+  }
   // Welcome image in channel
   if (config.channelId) {
     const channel = await client.channels.fetch(config.channelId).catch(() => null);

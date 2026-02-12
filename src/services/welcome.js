@@ -2,6 +2,7 @@ import { AttachmentBuilder, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuil
 import { createCanvas, loadImage, registerFont } from 'canvas';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import logger from '../utils/logger.js';
 
 // Optional: register a nice font (download and place in assets/fonts/)
 try {
@@ -119,6 +120,6 @@ export async function sendWelcomeDM(member) {
       components: [row, verifyRow],
     });
   } catch (err) {
-    console.log(`Could not DM ${member.user.tag}: ${err.message}`);
+    logger.warn(`Could not DM ${member.user.tag}: ${err.message}`);
   }
 }

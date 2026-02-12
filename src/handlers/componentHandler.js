@@ -7,14 +7,14 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-
 import { pathToFileURL } from 'node:url';
+import logger from '../utils/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * Map of customId prefix → handler module
- * @type {Map<string, { execute: Function, customId?: string | RegExp }>}
+ * @type {Map<string | RegExp, { execute: Function, customId: string | RegExp }>}
  */
 const componentHandlers = new Map();
 
@@ -24,6 +24,9 @@ const componentHandlers = new Map();
  */
 export async function loadComponents(client) {
   const categories = ['buttons', 'selectMenus', 'modals'];
+
+  // Clear old handlers before reloading
+  componentHandlers.clear();
 
   for (const category of categories) {
     const dir = path.join(__dirname, '..', 'components', category);
@@ -39,7 +42,7 @@ export async function loadComponents(client) {
         const handler = await import(fileUrl);
 
         if (!handler?.customId || typeof handler.execute !== 'function') {
-          console.warn(`Invalid component handler: ${category}/${file}`);
+          logger.warn(`Invalid component handler: ${category}/${file}`);
           continue;
         }
 
@@ -49,18 +52,18 @@ export async function loadComponents(client) {
           : handler.customId.source; // for display
 
         componentHandlers.set(handler.customId, handler);
-        console.log(`[COMPONENT] Loaded → ${category}/${file} (id: ${key})`);
+        logger.info(`[COMPONENT] Loaded → ${category}/${file} (id: ${key})`);
       }
     } catch (err) {
       if (err.code === 'ENOENT') {
-        console.log(`components/${category}/ not found – skipping`);
+        logger.info(`components/${category}/ not found – skipping`);
       } else {
-        console.error(`Failed to load components/${category}:`, err);
+        logger.error(`Failed to load components/${category}:`, err);
       }
     }
   }
 
-  console.log(`[COMPONENT] Total handlers loaded: ${componentHandlers.size}`);
+  logger.info(`[COMPONENT] Total handlers loaded: ${componentHandlers.size}`);
 }
 
 /**
@@ -89,7 +92,7 @@ export async function handleComponent(interaction, client) {
   }
 
   if (!matchedHandler) {
-    console.log(`[COMPONENT] No handler for customId: ${customId}`);
+    logger.debug(`[COMPONENT] No handler for customId: ${customId}`);
     return false;
   }
 
@@ -104,7 +107,7 @@ export async function handleComponent(interaction, client) {
     await handler.execute(interaction, client);
     return true; // handled
   } catch (error) {
-    console.error(`[COMPONENT ERROR] ${customId}:`, error);
+    logger.err(error, `Component Error: ${customId}`);
 
     const fallbackReply = {
       content: 'Something went wrong while processing this component.',
@@ -119,4 +122,20 @@ export async function handleComponent(interaction, client) {
 
     return true;
   }
+}
+
+/**
+ * Hot-reload all component handlers (used by /reload command)
+ * @param {import('discord.js').Client} client
+ */
+export async function reloadComponents(client) {
+  logger.info('[RELOAD] Starting component reload...');
+
+  // Clear old handlers
+  componentHandlers.clear();
+
+  // Re-run the load function
+  await loadComponents(client);
+
+  logger.info('[RELOAD] Components reload complete');
 }
