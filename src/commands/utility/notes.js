@@ -105,7 +105,7 @@ export async function execute(interaction) {
   // VIEW / LIST
   if (sub === 'view') {
     const category = interaction.options.getString('category') || 'general';
-    const name = interaction.options.getString('name')?.trim();
+    let name = interaction.options.getString('name')?.toLowerCase().trim();
 
     const catDir = await getCategoryDir(userDir, category);
     const notes = await listNotes(catDir);
