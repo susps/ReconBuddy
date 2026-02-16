@@ -12,7 +12,8 @@
     "dev": "nodemon src/index.js",
     "lint": "eslint . --ext .js",
     "format": "prettier --write .",
-    "deploy": "node scripts/deployCommands.js"
+    "deploy": "node scripts/deployCommands.js",
+    "clear": "node src/clearCommands.js"
   },
   "author": "",
   "license": "ISC",
