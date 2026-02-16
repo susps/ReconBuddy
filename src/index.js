@@ -47,6 +47,7 @@ const client = new discord.Client({
     discord.IntentsBitField.Flags.GuildMessages,
     discord.IntentsBitField.Flags.MessageContent,
     discord.IntentsBitField.Flags.GuildMessageReactions,
+    discord.IntentsBitField.Flags.GuildVoiceStates,
   ],
   partials: [
     discord.Partials.Message,
