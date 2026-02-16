@@ -69,4 +69,4 @@ export const log = {
 };
 
 // Export both
-export default logger;
+export default log;

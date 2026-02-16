@@ -13,7 +13,6 @@ export const data = new SlashCommandBuilder()
   .setName('antiraid')
   .setDescription('Manage raid mode and anti-spam/raid settings (owner only)')
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-  .setDMPermission(false)
 
   // Toggle raid mode (strict mode on/off)
   .addSubcommand(sub =>
