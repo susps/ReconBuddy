@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder, PermissionsBitField } from "discord.js";
 
 export const data = new SlashCommandBuilder()
     .setName("move")
@@ -11,27 +11,64 @@ export const data = new SlashCommandBuilder()
             .setDescription("The voice channel to move the user to")
             .addChannelTypes(2) // Only allow voice channels
             .setRequired(true))
-    .setDefaultMemberPermissions(0); // Only allow users with admin permissions to use this command
+    .addUserOption(opt =>
+        opt.setName("target")
+            .setDescription("The user to move"));    
 
 export async function execute(interaction) {
-    const targetUser = interaction.options.getUser("target") || interaction.user;
-    const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
-    const targetChannel = interaction.options.getChannel("channel");
+    const targetUser = interaction.options.getUser('target') || interaction.user;
+    const targetMember = interaction.options.getMember('target') || interaction.member;
+    const channel = interaction.options.getChannel('channel');
 
     if (!targetMember) {
-        return interaction.editReply({ content: "User not found in this server.", ephemeral: true });
+        return interaction.reply({
+            content: "Unable to find the target member.",
+            ephemeral: true
+        }).catch(console.error);
     }
-    if(!targetMember.voice?.channel) {
-        return interaction.editReply({ content: "User is not in a voice channel.", ephemeral: true });
+
+    // Check bot permissions
+    if (!interaction.guild.members.me.permissions.has(PermissionsBitField.Flags.MoveMembers)) {
+        return interaction.reply({
+            content: "I don't have permission to move members.",
+            ephemeral: true
+        }).catch(console.error);
     }
-    if (targetMember.voice.channel.id === targetChannel.id) {
-        return interaction.editReply({ content: "User is already in that voice channel.", ephemeral: true });
+
+    // Check user permissions if moving someone else
+    const isSelfMove = targetMember.id === interaction.member.id;
+    if (!isSelfMove && !interaction.member.permissions.has(PermissionsBitField.Flags.MoveMembers)) {
+        return interaction.reply({
+            content: "You don't have permission to move other members.",
+            ephemeral: true
+        }).catch(console.error);
     }
+
+    if (!targetMember.voice?.channel) {
+        return interaction.reply({
+            content: "The target user is not in a voice channel.",
+            ephemeral: true
+        }).catch(console.error);
+    }
+
+    if (targetMember.voice.channel.id === channel.id) {
+        return interaction.reply({
+            content: "The target user is already in that channel.",
+            ephemeral: true
+        }).catch(console.error);
+    }
+
     try {
-        await targetMember.voice.setChannel(targetChannel);
-        return interaction.editReply({ content: `Moved ${targetUser.tag} to ${targetChannel.name}.`, ephemeral: true });
+        await targetMember.voice.setChannel(channel);
+        await interaction.reply({
+            content: `Moved ${targetUser.tag} to ${channel.name}.`,
+            ephemeral: true
+        }).catch(console.error);
     } catch (error) {
-        console.error("Error moving user:", error);
-        return interaction.editReply({ content: "Failed to move the user. Do I have the necessary permissions?", ephemeral: true });
+        console.error("Failed to move user:", error);
+        await interaction.reply({
+            content: "Failed to move the user. Check bot permissions (e.g., MOVE_MEMBERS) or channel access.",
+            ephemeral: true
+        }).catch(console.error);
     }
 }
