@@ -1,6 +1,6 @@
-﻿const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+﻿import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 
-module.exports = {
+export default {
     data: new SlashCommandBuilder()
         .setName('8ball')
         .setDescription('Ask the Magic 8-Ball a question.')

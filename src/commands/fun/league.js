@@ -1,5 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const fetch = require('node-fetch');
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import fetch from 'node-fetch';
 
 // Automation: Helper to always get the latest League patch version
 async function getLatestVersion() {
@@ -13,7 +13,7 @@ async function getLatestVersion() {
     }
 }
 
-module.exports = {
+export default {
     data: new SlashCommandBuilder()
         .setName('league')
         .setDescription('Complete League of Legends Utility')

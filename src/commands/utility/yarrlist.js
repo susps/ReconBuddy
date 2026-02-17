@@ -1,10 +1,10 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const axios = require('axios');
-const cheerio = require('cheerio');
+import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import axios from 'axios';
+import cheerio from 'cheerio';
 
 const BASE_URL = 'https://yarrlist.net';
 
-module.exports = {
+export default {
   data: new SlashCommandBuilder()
     .setName('yarrlist')
     .setDescription('Arr! Scrape & show pirate site lists from yarrlist.net 🏴‍☠️')

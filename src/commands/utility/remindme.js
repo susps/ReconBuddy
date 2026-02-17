@@ -1,7 +1,7 @@
-﻿const { SlashCommandBuilder } = require('discord.js');
-const ms = require('ms');  // Ensure the 'ms' package is installed (npm install ms)
+﻿import { SlashCommandBuilder } from 'discord.js';
+import ms from 'ms';  // Ensure the 'ms' package is installed (npm install ms)
 
-module.exports = {
+export default {
     data: new SlashCommandBuilder()
         .setName('remindme')
         .setDescription('Sets a reminder for a specified duration.')

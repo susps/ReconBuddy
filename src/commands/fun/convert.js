@@ -1,10 +1,10 @@
-﻿const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const fetch = require('node-fetch');
+﻿import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import fetch from 'node-fetch';
 
 const API_KEY = 'b9af52876943d395cec002e7'; // Insert your API key here
 const BASE_URL = `https://v6.exchangerate-api.com/v6/${API_KEY}/latest/`;
 
-module.exports = {
+export default {
     data: new SlashCommandBuilder()
         .setName('convert')
         .setDescription('Convert between currencies with live exchange rates.')
