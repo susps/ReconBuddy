@@ -1,45 +1,63 @@
 // src/commands/economy/stock.js
-import { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { 
   getStock, 
   buyStock, 
   sellStock, 
   getPortfolio, 
-  getMarket,
-  generateChart,
+  getMarket 
 } from '../../services/stockMarket.js';
 import { getUser } from '../../services/economy.js';
 
 export const data = new SlashCommandBuilder()
   .setName('stock')
   .setDescription('Stock market commands')
-  .addSubcommand(sub => sub.setName('market').setDescription('View all stocks'))
-  .addSubcommand(sub => sub.setName('portfolio').setDescription('Your holdings'))
+  
+  // Market overview
+  .addSubcommand(sub =>
+    sub.setName('market').setDescription('View all available stocks and prices')
+  )
+  
+  // Your portfolio
+  .addSubcommand(sub =>
+    sub
+      .setName('portfolio')
+      .setDescription('View stock holdings and profit/loss')
+      .addUserOption(opt => opt.setName('user').setDescription('User to view (leave blank for yourself)').setRequired(false))
+  )
+  
+  // Buy shares
   .addSubcommand(sub =>
     sub
       .setName('buy')
-      .setDescription('Buy shares')
-      .addStringOption(opt => opt.setName('ticker').setDescription('Ticker (e.g. NEXI)').setRequired(true))
-      .addIntegerOption(opt => opt.setName('quantity').setDescription('Shares').setMinValue(1).setRequired(true))
+      .setDescription('Buy shares of a stock')
+      .addStringOption(opt => opt.setName('ticker').setDescription('Stock ticker (e.g. NEXI)').setRequired(true))
+      .addIntegerOption(opt => opt.setName('quantity').setDescription('Number of shares').setMinValue(1).setRequired(true))
   )
+  
+  // Sell shares
   .addSubcommand(sub =>
     sub
       .setName('sell')
-      .setDescription('Sell shares')
-      .addStringOption(opt => opt.setName('ticker').setDescription('Ticker').setRequired(true))
-      .addIntegerOption(opt => opt.setName('quantity').setDescription('Shares').setMinValue(1).setRequired(true))
+      .setDescription('Sell shares of a stock')
+      .addStringOption(opt => opt.setName('ticker').setDescription('Stock ticker').setRequired(true))
+      .addIntegerOption(opt => opt.setName('quantity').setDescription('Number of shares').setMinValue(1).setRequired(true))
   )
+  
+  // View detailed stock info
   .addSubcommand(sub =>
     sub
       .setName('view')
-      .setDescription('View stock details')
-      .addStringOption(opt => opt.setName('ticker').setDescription('Ticker').setRequired(true))
+      .setDescription('View detailed info about a stock')
+      .addStringOption(opt => opt.setName('ticker').setDescription('Stock ticker (e.g. NEXI)').setRequired(true))
   )
+  
+  // View price history (text list)
   .addSubcommand(sub =>
     sub
-      .setName('chart')
-      .setDescription('View price history chart')
-      .addStringOption(opt => opt.setName('ticker').setDescription('Ticker').setRequired(true))
+      .setName('history')
+      .setDescription('View recent price history for a stock')
+      .addStringOption(opt => opt.setName('ticker').setDescription('Stock ticker (e.g. NEXI)').setRequired(true))
   );
 
 export async function execute(interaction) {
@@ -50,17 +68,25 @@ export async function execute(interaction) {
 
   if (sub === 'market') {
     const stocks = await getMarket();
-    if (stocks.length === 0) return interaction.editReply({ content: 'No stocks yet.' });
+
+    if (stocks.length === 0) {
+      return interaction.editReply({ content: 'No stocks available yet.' });
+    }
 
     const embed = new EmbedBuilder()
       .setColor(0x5865f2)
-      .setTitle('Stock Market')
-      .setDescription('Current prices');
+      .setTitle('Stock Market Overview')
+      .setDescription('Current prices and stats')
+      .setTimestamp();
 
-    stocks.forEach(s => {
+    stocks.forEach(stock => {
+      const change24h = stock.history.length > 1
+        ? ((stock.price - stock.history[stock.history.length - 2].price) / stock.history[stock.history.length - 2].price * 100).toFixed(2)
+        : 0;
+
       embed.addFields({
-        name: `${s.ticker} – ${s.name}`,
-        value: `$${s.price.toLocaleString()}\nVolatility: ${(s.volatility*100).toFixed(1)}%`,
+        name: `${stock.ticker} - ${stock.name}`,
+        value: `Price: **$${stock.price.toLocaleString()}**\n24h Change: ${change24h > 0 ? '+' : ''}${change24h}%\nVolatility: ${(stock.volatility * 100).toFixed(1)}%`,
         inline: true,
       });
     });
@@ -69,25 +95,50 @@ export async function execute(interaction) {
   }
 
   if (sub === 'portfolio') {
-    const portfolio = await getPortfolio(interaction.user.id);
-    if (portfolio.length === 0) return interaction.editReply({ content: 'No holdings yet.' });
+    const targetUser = interaction.options.getUser('user') || interaction.user;
+    const portfolio = await getPortfolio(targetUser.id);
+
+    if (portfolio.length === 0) {
+      const isOwn = targetUser.id === interaction.user.id;
+      return interaction.editReply({ content: isOwn ? 'You have no stocks yet. Use /stock buy to start.' : `${targetUser.tag} has no stocks.` });
+    }
 
     const embed = new EmbedBuilder()
       .setColor(0x57f287)
-      .setTitle('Your Portfolio');
+      .setTitle(`${targetUser.tag}'s Portfolio`)
+      .setDescription('Current holdings')
+      .setTimestamp();
 
-    for (const h of portfolio) {
-      const stock = await getStock(h.ticker);
+    let totalValue = 0;
+    let totalCost = 0;
+
+    for (const holding of portfolio) {
+      const stock = await getStock(holding.ticker);
       if (!stock) continue;
-      const value = stock.price * h.quantity;
-      const cost = h.buyPrice * h.quantity;
-      const pl = value - cost;
+
+      const currentValue = stock.price * holding.quantity;
+      const buyValue = holding.buyPrice * holding.quantity;
+      const profitLoss = currentValue - buyValue;
+      const plText = profitLoss >= 0 ? `+$${profitLoss.toLocaleString()}` : `-$${Math.abs(profitLoss).toLocaleString()}`;
+
+      totalValue += currentValue;
+      totalCost += buyValue;
+
       embed.addFields({
-        name: `${h.ticker} (${h.quantity} shares)`,
-        value: `Value: $${value.toLocaleString()}\nP/L: ${pl > 0 ? '+' : ''}$${pl.toLocaleString()}`,
+        name: `${holding.ticker} - ${holding.quantity} shares`,
+        value: `Buy Price: $${holding.buyPrice.toLocaleString()}\nCurrent Value: $${currentValue.toLocaleString()}\nP/L: **${plText}**`,
         inline: false,
       });
     }
+
+    const netPL = totalValue - totalCost;
+    const netPLText = netPL >= 0 ? `+$${netPL.toLocaleString()}` : `-$${Math.abs(netPL).toLocaleString()}`;
+
+    embed.addFields({
+      name: 'Portfolio Summary',
+      value: `Total Value: **$${totalValue.toLocaleString()}**\nTotal Cost: $${totalCost.toLocaleString()}\nNet P/L: **${netPLText}**`,
+      inline: false,
+    });
 
     return interaction.editReply({ embeds: [embed] });
   }
@@ -96,18 +147,28 @@ export async function execute(interaction) {
     const quantity = interaction.options.getInteger('quantity', true);
 
     const stock = await getStock(ticker);
-    if (!stock) return interaction.editReply({ content: 'Stock not found.' });
+    if (!stock) return interaction.editReply({ content: 'Stock not found. Use /stock market to see available stocks.' });
 
     const cost = stock.price * quantity;
 
     const user = await getUser(interaction.user.id, interaction.user.username);
-    if (user.balance < cost) return interaction.editReply({ content: 'Not enough coins.' });
+    if (user.balance < cost) {
+      return interaction.editReply({ content: `Not enough coins. You have $${user.balance.toLocaleString()}, need $${cost.toLocaleString()}.`, ephemeral: true });
+    }
 
-    const { cost: paid, newBalance } = await buyStock(interaction.user.id, interaction.user.username, ticker, quantity);
+    const { cost: paidCost, newBalance } = await buyStock(interaction.user.id, interaction.user.username, ticker, quantity);
 
-    return interaction.editReply({
-      content: `Bought ${quantity} shares of ${ticker} for $${paid.toLocaleString()}. New balance: $${newBalance.toLocaleString()}`,
-    });
+    const embed = new EmbedBuilder()
+      .setColor(0x57f287)
+      .setTitle('Stock Purchase Successful')
+      .setDescription(`You bought **${quantity}** shares of **${ticker}** (${stock.name}) at $${stock.price.toLocaleString()} each.`)
+      .addFields(
+        { name: 'Total Cost', value: `$${paidCost.toLocaleString()}`, inline: true },
+        { name: 'New Balance', value: `$${newBalance.toLocaleString()}`, inline: true }
+      )
+      .setTimestamp();
+
+    return interaction.editReply({ embeds: [embed] });
   }
 
   if (sub === 'sell') {
@@ -118,14 +179,22 @@ export async function execute(interaction) {
 
     const { revenue, remaining } = await sellStock(interaction.user.id, ticker, quantity);
 
-    return interaction.editReply({
-      content: `Sold ${quantity} shares of ${ticker} for $${revenue.toLocaleString()}. Remaining: ${remaining}.`,
-    });
+    const embed = new EmbedBuilder()
+      .setColor(0x57f287)
+      .setTitle('Stock Sale Successful')
+      .setDescription(`You sold **${quantity}** shares of **${ticker}** (${stock.name}) at $${stock.price.toLocaleString()} each.`)
+      .addFields(
+        { name: 'Revenue', value: `$${revenue.toLocaleString()}`, inline: true },
+        { name: 'Remaining Shares', value: remaining.toLocaleString(), inline: true }
+      )
+      .setTimestamp();
+
+    return interaction.editReply({ embeds: [embed] });
   }
 
   if (sub === 'view') {
     const stock = await getStock(ticker);
-    if (!stock) return interaction.editReply({ content: 'Stock not found.' });
+    if (!stock) return interaction.editReply({ content: 'Stock not found. Use /stock market to see available stocks.' });
 
     const change24h = stock.history.length > 1
       ? ((stock.price - stock.history[stock.history.length - 2].price) / stock.history[stock.history.length - 2].price * 100).toFixed(2)
@@ -133,13 +202,14 @@ export async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setColor(0x5865f2)
-      .setTitle(`${stock.ticker} – ${stock.name}`)
+      .setTitle(`${stock.ticker} - ${stock.name}`)
       .setDescription(`Current Price: **$${stock.price.toLocaleString()}**`)
       .addFields(
-        { name: '24h Change', value: `${change24h > 0 ? '+' : ''}${change24h}%`, inline: true },
+        { name: '24h Change', value: `${change24h >= 0 ? '+' : ''}${change24h}%`, inline: true },
         { name: 'Volatility', value: `${(stock.volatility * 100).toFixed(1)}%`, inline: true },
         { name: 'Last Updated', value: stock.lastUpdated.toLocaleString(), inline: true }
-      );
+      )
+      .setTimestamp();
 
     return interaction.editReply({ embeds: [embed] });
   }
@@ -147,41 +217,38 @@ export async function execute(interaction) {
   if (sub === 'chart') {
     const stock = await getStock(ticker);
     if (!stock || stock.history.length < 2) {
-      return interaction.editReply({ content: 'Not enough price history.', ephemeral: true });
+      return interaction.editReply({ content: 'Not enough price history for this stock.', ephemeral: true });
     }
 
-    const canvas = createCanvas(800, 400);
-    const ctx = canvas.getContext('2d');
+    const history = stock.history.slice(-10); // last 10 updates for readability
 
-    ctx.fillStyle = '#2f3136';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const embed = new EmbedBuilder()
+      .setColor(0x5865f2)
+      .setTitle(`${ticker} Price History`)
+      .setDescription('Last 10 price updates (approximate 24h window)');
 
-    const prices = stock.history.map(h => h.price);
-    const max = Math.max(...prices);
-    const min = Math.min(...prices);
-    const range = max - min || 1;
+    let minPrice = Infinity;
+    let maxPrice = -Infinity;
 
-    ctx.beginPath();
-    ctx.strokeStyle = '#57f287';
-    ctx.lineWidth = 3;
+    history.forEach((entry, index) => {
+      const time = entry.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const price = entry.price;
+      minPrice = Math.min(minPrice, price);
+      maxPrice = Math.max(maxPrice, price);
 
-    prices.forEach((price, i) => {
-      const x = (i / (prices.length - 1)) * (canvas.width - 40) + 20;
-      const y = canvas.height - 40 - ((price - min) / range) * (canvas.height - 80);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
+      embed.addFields({
+        name: `#${index + 1} - ${time}`,
+        value: `$${price.toLocaleString()}`,
+        inline: true,
+      });
     });
 
-    ctx.stroke();
+    embed.addFields({
+      name: 'Range',
+      value: `$${minPrice.toLocaleString()} - $${maxPrice.toLocaleString()}`,
+      inline: false,
+    });
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '20px Arial';
-    ctx.fillText(`${ticker} Price (24h)`, 20, 30);
-    ctx.fillText(`$${min.toLocaleString()}`, 20, canvas.height - 10);
-    ctx.fillText(`$${max.toLocaleString()}`, 20, 40);
-
-    const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'chart.png' });
-
-    await interaction.editReply({ files: [attachment] });
+    return interaction.editReply({ embeds: [embed] });
   }
 }

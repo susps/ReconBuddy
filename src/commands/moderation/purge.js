@@ -124,14 +124,18 @@ export async function execute(interaction) {
   const collector = confirmMsg.createMessageComponentCollector({ filter, time: 30_000, componentType: ComponentType.Button });
 
   collector.on('collect', async i => {
-    await i.deferUpdate();
+    try {
+      await i.deferUpdate().catch(() => {});
+    } catch (err) {
+      // Interaction may have expired, continue anyway
+    }
 
     if (i.customId === 'purge_confirm_no') {
       return i.editReply({
         content: 'Purge cancelled.',
         embeds: [],
         components: [],
-      });
+      }).catch(() => {});
     }
 
     // User confirmed Yes → delete
@@ -145,14 +149,14 @@ export async function execute(interaction) {
         .addFields({ name: 'Reason', value: reason, inline: false })
         .setTimestamp();
 
-      await i.editReply({ embeds: [successEmbed], components: [] });
+      await i.editReply({ embeds: [successEmbed], components: [] }).catch(() => {});
     } catch (err) {
       console.error('Bulk delete failed:', err);
       await i.editReply({
         content: 'Failed to delete messages (some may be >14 days old or missing perms).',
         embeds: [],
         components: [],
-      });
+      }).catch(() => {});
     }
   });
 

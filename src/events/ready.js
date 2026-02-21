@@ -3,7 +3,7 @@ import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'disc
 import { getGuildConfig } from '../services/ticket.js';
 import { cacheInvites } from '../services/inviteTracker.js';
 
-import { startPriceUpdates } from '../services/stockMarket.js';
+import { startPriceUpdates, updateAllPrices, initStocks } from '../services/stockMarket.js';
 
 export const name = 'clientReady';
 export const once = true;
@@ -14,7 +14,11 @@ export const once = true;
 export async function execute(client) {
   console.log(`[READY] Logged in as ${client.user.tag} (${client.user.id})`);
   console.log(`[READY] Serving ${client.guilds.cache.size} guilds • ${client.users.cache.size} users`);
-  startPriceUpdates();
+  
+  // Initialize stocks
+  await initStocks();
+  
+  startPriceUpdates(client);
   console.log('[READY] Stock market price updates started');
   const { startStatusRotation } = await import('../utils/statusRotator.js');
 

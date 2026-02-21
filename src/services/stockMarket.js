@@ -4,25 +4,72 @@ import Portfolio from '../models/Portfolio.js';
 import User from '../models/User.js';
 import cron from 'node-cron';
 import { createCanvas } from 'canvas';
+import { getUser, addCoins, removeCoins } from './economy.js';
+import logger from '../utils/logger.js';
 
 // Initialize default stocks on startup
 export async function initStocks() {
-  const existing = await Stock.findOne({ ticker: 'NEXI' });
-  if (!existing) {
-    await Stock.create({
-      ticker: 'NEXI',
-      name: 'NEXI Coin',
-      price: 100,
-      volatility: 0.12,
-      factors: { memberGrowth: 0.15, messageActivity: 0.25 },
-    });
-    await Stock.create({
-      ticker: 'TECH',
-      name: 'Tech Giants Inc.',
-      price: 250,
-      volatility: 0.08,
-    });
-    console.log('[STOCK] Default stocks initialized');
+  try {
+    logger.info('[STOCK] Checking for existing stocks...');
+    const existing = await Stock.findOne({ ticker: 'NEXI' });
+    
+    if (!existing) {
+      logger.info('[STOCK] No stocks found. Creating default stocks...');
+      await Stock.create({
+        ticker: 'NEXI',
+        name: 'NEXI Coin',
+        price: 150,
+        volatility: 0.12,
+        factors: { memberGrowth: 0.15, messageActivity: 0.25 },
+      });
+      await Stock.create({
+        ticker: 'TECH',
+        name: 'Tech Giants Inc.',
+        price: 300,
+        volatility: 0.08,
+      });
+      await Stock.create({
+        ticker: 'GME',
+        name: 'GameStop Corp.',
+        price: 50,
+        volatility: 0.2,
+      });
+      await Stock.create({
+        ticker: 'CRYPTO',
+        name: 'Crypto Index',
+        price: 200,
+        volatility: 0.15,
+      });
+      await Stock.create({
+        ticker: 'RETAIL',
+        name: 'Retail Leaders',
+        price: 80,
+        volatility: 0.1,
+      });
+      await Stock.create({
+        ticker: 'ENERGY',
+        name: 'Energy Co.',
+        price: 120,
+        volatility: 0.09,
+      });
+      await Stock.create({
+        ticker: 'HEALTH',
+        name: 'Health Corp.',
+        price: 90,
+        volatility: 0.07,
+      });
+      await Stock.create({
+        ticker: 'FINANCE',
+        name: 'Finance Group',
+        price: 110,
+        volatility: 0.06,
+      });
+      logger.info('[STOCK] ✓ Default stocks initialized (8 new stocks created)');
+    } else {
+      logger.info('[STOCK] Stocks already exist in database, skipping initialization');
+    }
+  } catch (error) {
+    logger.error('[STOCK] Error initializing stocks:', error);
   }
 }
 
@@ -37,15 +84,41 @@ export async function updateAllPrices(client) {
     const fluctuation = (Math.random() - 0.5) * stock.volatility * newPrice;
     newPrice += fluctuation;
 
-    // NEXI special: server variables
+    // NEXI special: server variables (advanced calculation)
     if (stock.ticker === 'NEXI') {
+      // Get current metrics
       const totalMembers = client.guilds.cache.reduce((acc, g) => acc + g.memberCount, 0);
-      const memberGrowth = totalMembers * stock.factors.memberGrowth;
-
-      // Placeholder message activity (improve later with real tracking)
-      const messageActivity = client.channels.cache.size * stock.factors.messageActivity;
-
-      newPrice += memberGrowth + messageActivity;
+      const onlineMembers = client.guilds.cache.reduce((acc, g) => acc + g.members.cache.filter(m => m.presence?.status === 'online').size, 0);
+      const totalGuilds = client.guilds.cache.size;
+      const textChannels = client.channels.cache.filter(c => c.isTextBased()).size;
+      
+      // Get previous metrics (store in stock.metadata if available)
+      const prevMembers = stock.metadata?.prevMembers || totalMembers;
+      const prevGuilds = stock.metadata?.prevGuilds || totalGuilds;
+      
+      // Calculate deltas (rates of change)
+      const memberDelta = totalMembers - prevMembers;
+      const guildDelta = totalGuilds - prevGuilds;
+      const onlineRatio = totalMembers > 0 ? onlineMembers / totalMembers : 0;
+      
+      // Advanced weighted factors
+      const memberGrowthImpact = (memberDelta / Math.max(1, prevMembers)) * stock.factors.memberGrowth * (stock.price * 0.05);
+      const guildGrowthImpact = (guildDelta / Math.max(1, prevGuilds)) * 0.1 * (stock.price * 0.03);
+      const engagementImpact = onlineRatio * 0.15 * (stock.price * 0.02);
+      const channelActivityImpact = (textChannels / Math.max(1, totalGuilds)) * stock.factors.messageActivity * (stock.price * 0.02);
+      
+      // Apply momentum (dampen extreme changes)
+      const totalImpact = memberGrowthImpact + guildGrowthImpact + engagementImpact + channelActivityImpact;
+      const cappedImpact = Math.max(-stock.price * 0.1, Math.min(stock.price * 0.1, totalImpact));
+      
+      newPrice += cappedImpact;
+      
+      // Update metadata for next calculation
+      stock.metadata = {
+        prevMembers: totalMembers,
+        prevGuilds: totalGuilds,
+        lastEngagementRatio: onlineRatio
+      };
     }
 
     newPrice = Math.max(1, Math.round(newPrice));
@@ -65,7 +138,13 @@ export async function updateAllPrices(client) {
 
 // Start hourly price updates
 export function startPriceUpdates(client) {
-  cron.schedule('0 * * * *', () => updateAllPrices(client));
+  cron.schedule('* * * * *', async () => {
+    logger.info('[STOCK CRON] Starting price update...');
+    await updateAllPrices(client);
+    logger.info('[STOCK CRON] Update complete');
+  });
+
+  logger.info('[STOCK] Price update cron scheduled (every minute)');
 }
 
 // Get single stock
@@ -88,7 +167,7 @@ export async function buyStock(userId, username, ticker, quantity) {
   const user = await getUser(userId, username);
   if (user.balance < cost) throw new Error('Insufficient balance');
 
-  await removeCoins(userId, cost);
+  await removeCoins(userId, cost, username);
 
   let portfolio = await Portfolio.findOne({ userId });
   if (!portfolio) {
@@ -132,7 +211,12 @@ export async function sellStock(userId, ticker, quantity) {
   }
 
   await portfolio.save();
-  await addCoins(userId, revenue);
+  
+  // Fetch user to get username for addCoins
+  const user = await User.findOne({ userId });
+  if (!user) throw new Error('User not found');
+  
+  await addCoins(userId, revenue, user.username);
 
   return { revenue, remaining: holding.quantity };
 }
