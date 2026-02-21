@@ -13,8 +13,7 @@ async function getLatestVersion() {
     }
 }
 
-export default {
-    data: new SlashCommandBuilder()
+export const data = new SlashCommandBuilder()
         .setName('league')
         .setDescription('Complete League of Legends Utility')
         
@@ -47,9 +46,9 @@ export default {
             .addStringOption(opt => opt.setName('queue').setDescription('solo or flex').setRequired(true).addChoices(
                 { name: 'Solo/Duo', value: 'ranked-solo-5x5' },
                 { name: 'Flex', value: 'ranked-flex-sr' }
-            ))),
+            )));
 
-    async execute(interaction) {
+export async function execute(interaction) {
         await interaction.deferReply();
         const subcommand = interaction.options.getSubcommand();
         const version = await getLatestVersion();
@@ -144,5 +143,4 @@ export default {
             const latest = patchData.patches[0];
             return interaction.editReply(`**Latest Patch: ${latest.version}**\n${latest.details.slice(0, 500)}...`);
         }
-    }
-};
+}

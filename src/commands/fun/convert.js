@@ -4,27 +4,26 @@ import fetch from 'node-fetch';
 const API_KEY = 'b9af52876943d395cec002e7'; // Insert your API key here
 const BASE_URL = `https://v6.exchangerate-api.com/v6/${API_KEY}/latest/`;
 
-export default {
-    data: new SlashCommandBuilder()
-        .setName('convert')
-        .setDescription('Convert between currencies with live exchange rates.')
-        .addNumberOption(option =>
-            option.setName('amount')
-                .setDescription('The amount of money to convert')
-                .setRequired(true)
-        )
-        .addStringOption(option =>
-            option.setName('from')
-                .setDescription('Currency code to convert from (e.g., USD)')
-                .setRequired(true)
-        )
-        .addStringOption(option =>
-            option.setName('to')
-                .setDescription('Currency code to convert to (e.g., EUR)')
-                .setRequired(true)
-        ),
+export const data = new SlashCommandBuilder()
+    .setName('convert')
+    .setDescription('Convert between currencies with live exchange rates.')
+    .addNumberOption(option =>
+        option.setName('amount')
+            .setDescription('The amount of money to convert')
+            .setRequired(true)
+    )
+    .addStringOption(option =>
+        option.setName('from')
+            .setDescription('Currency code to convert from (e.g., USD)')
+            .setRequired(true)
+    )
+    .addStringOption(option =>
+        option.setName('to')
+            .setDescription('Currency code to convert to (e.g., EUR)')
+            .setRequired(true)
+    );
 
-    async execute(interaction) {
+export async function execute(interaction) {
         const amount = interaction.options.getNumber('amount');
         const fromCurrency = interaction.options.getString('from').toUpperCase();
         const toCurrency = interaction.options.getString('to').toUpperCase();
@@ -54,7 +53,6 @@ export default {
 
         } catch (error) {
             console.error(error);
-            await interaction.reply(`❌ An error occurred while fetching the exchange rate.`);
-        }
-    },
-};
+        await interaction.reply(`❌ An error occurred while fetching the exchange rate.`);
+    }
+}

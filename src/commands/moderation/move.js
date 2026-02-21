@@ -5,15 +5,13 @@ export const data = new SlashCommandBuilder()
     .setDescription("Moves a user to a different voice channel")
     .addUserOption(opt =>
         opt.setName("target")
-            .setDescription("The user to move"))
+            .setDescription("The user to move")
+            .setRequired(true))
     .addChannelOption(opt =>
         opt.setName("channel")
             .setDescription("The voice channel to move the user to")
             .addChannelTypes(2) // Only allow voice channels
-            .setRequired(true))
-    .addUserOption(opt =>
-        opt.setName("target")
-            .setDescription("The user to move"));    
+            .setRequired(true));    
 
 export async function execute(interaction) {
     const targetUser = interaction.options.getUser('target') || interaction.user;

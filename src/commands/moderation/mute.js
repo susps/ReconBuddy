@@ -20,6 +20,7 @@ export const data = new SlashCommandBuilder()
       .setRequired(false)
   )
   .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+  .setDMPermission(false);
 
 export async function execute(interaction) {
   const target = interaction.options.getMember('target');

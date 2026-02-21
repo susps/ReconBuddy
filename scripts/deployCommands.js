@@ -60,6 +60,12 @@ console.log(
 const commands = [];
 const commandsRoot = path.join(__dirname, '..', 'src', 'commands');
 
+// Track failed commands for debugging
+const failedCommands = {
+  loadErrors: [],    // Commands that failed to load from files
+  deploymentErrors: [] // Commands that failed to deploy to Discord
+};
+
 async function collectCommands(currentDir) {
   let count = 0;
 
@@ -84,6 +90,10 @@ async function collectCommands(currentDir) {
 
         if (!module?.data) {
           console.warn(`  Skipping ${entry.name} — missing 'data' export`);
+          failedCommands.loadErrors.push({
+            file: entry.name,
+            reason: "missing 'data' export"
+          });
           continue;
         }
 
@@ -91,6 +101,10 @@ async function collectCommands(currentDir) {
 
         if (!dataJson?.name) {
           console.warn(`  Skipping ${entry.name} — data missing 'name'`);
+          failedCommands.loadErrors.push({
+            file: entry.name,
+            reason: "data missing 'name' field"
+          });
           continue;
         }
 
@@ -100,6 +114,10 @@ async function collectCommands(currentDir) {
       } catch (err) {
         console.error(`  Failed to load ${entry.name}:`);
         console.error(`    ${err.message}`);
+        failedCommands.loadErrors.push({
+          file: entry.name,
+          reason: err.message
+        });
       }
     }
   } catch (err) {
@@ -109,6 +127,44 @@ async function collectCommands(currentDir) {
   }
 
   return count;
+}
+
+/**
+ * Print a summary of all failed commands and their reasons
+ */
+function printFailureReport() {
+  const hasLoadErrors = failedCommands.loadErrors.length > 0;
+  const hasDeployErrors = failedCommands.deploymentErrors.length > 0;
+
+  if (!hasLoadErrors && !hasDeployErrors) {
+    console.log('✓ All commands loaded and deployed successfully!');
+    return;
+  }
+
+  console.log('\n' + '═'.repeat(60));
+  console.log('DEPLOYMENT FAILURE REPORT');
+  console.log('═'.repeat(60));
+
+  if (hasLoadErrors) {
+    console.log(`\n❌ LOAD ERRORS (${failedCommands.loadErrors.length}):`);
+    failedCommands.loadErrors.forEach((failed, idx) => {
+      console.log(`   ${idx + 1}. ${failed.file}`);
+      console.log(`      Reason: ${failed.reason}`);
+    });
+  }
+
+  if (hasDeployErrors) {
+    console.log(`\n❌ DEPLOYMENT ERRORS (${failedCommands.deploymentErrors.length}):`);
+    failedCommands.deploymentErrors.forEach((failed, idx) => {
+      console.log(`   ${idx + 1}. /${failed.name}`);
+      console.log(`      Reason: ${failed.reason}`);
+      if (failed.statusCode) {
+        console.log(`      Status Code: ${failed.statusCode}`);
+      }
+    });
+  }
+
+  console.log('\n' + '═'.repeat(60) + '\n');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -147,10 +203,35 @@ async function collectCommands(currentDir) {
     }
 
     console.log(`\nSuccess! Registered ${response.length} command(s).`);
+    
+    // Print any accumulated failures
+    printFailureReport();
+    
     console.log('Deployment finished.');
   } catch (error) {
     console.error('Deployment failed:');
     console.error(error);
+
+    // Track deployment error
+    if (error.rawError?.errors) {
+      // Handle validation errors for specific commands
+      Object.entries(error.rawError.errors).forEach(([cmdName, cmdError]) => {
+        failedCommands.deploymentErrors.push({
+          name: cmdName || 'unknown',
+          reason: JSON.stringify(cmdError),
+          statusCode: error.status || error.code
+        });
+      });
+    } else {
+      // Handle general deployment error
+      failedCommands.deploymentErrors.push({
+        name: 'batch_deployment',
+        reason: error.message,
+        statusCode: error.status || error.code
+      });
+    }
+
+    printFailureReport();
 
     if (error.code === 401) {
       console.error(' → Invalid or expired token');

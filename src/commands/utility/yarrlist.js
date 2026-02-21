@@ -1,35 +1,34 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import axios from 'axios';
-import cheerio from 'cheerio';
+import { load } from 'cheerio';
 
 const BASE_URL = 'https://yarrlist.net';
 
-export default {
-  data: new SlashCommandBuilder()
-    .setName('yarrlist')
-    .setDescription('Arr! Scrape & show pirate site lists from yarrlist.net 🏴‍☠️')
-    .addStringOption(option =>
-      option
-        .setName('section')
-        .setDescription('Which category? (leave empty to see all sections)')
-        .setRequired(false)
-        .addChoices(
-          { name: 'Movies/TV Shows', value: 'movies-and-tv-shows' },
-          { name: 'Anime', value: 'anime-list' },
-          { name: 'Manga', value: 'manga-list' },
-          { name: 'Live Sports', value: 'sports-live-streaming' },
-          { name: 'Live TV', value: 'live-tv-list' },
-          { name: 'Torrents', value: 'torrent-sites-list' },
-          { name: 'Games', value: 'games-download-sites' },
-          { name: 'Music', value: 'music-download-sites-list' },
-          { name: 'eBooks', value: 'ebooks-list' },
-          { name: 'Comics', value: 'comics-list' },
-          { name: 'VPNs', value: 'list-with-best-vpn-service-2025' },
-          { name: 'AdBlockers', value: 'adblockers-list' }
-        )
-    ),
+export const data = new SlashCommandBuilder()
+  .setName('yarrlist')
+  .setDescription('Arr! Scrape & show pirate site lists from yarrlist.net 🏴‍☠️')
+  .addStringOption(option =>
+    option
+      .setName('section')
+      .setDescription('Which category? (leave empty to see all sections)')
+      .setRequired(false)
+      .addChoices(
+        { name: 'Movies/TV Shows', value: 'movies-and-tv-shows' },
+        { name: 'Anime', value: 'anime-list' },
+        { name: 'Manga', value: 'manga-list' },
+        { name: 'Live Sports', value: 'sports-live-streaming' },
+        { name: 'Live TV', value: 'live-tv-list' },
+        { name: 'Torrents', value: 'torrent-sites-list' },
+        { name: 'Games', value: 'games-download-sites' },
+        { name: 'Music', value: 'music-download-sites-list' },
+        { name: 'eBooks', value: 'ebooks-list' },
+        { name: 'Comics', value: 'comics-list' },
+        { name: 'VPNs', value: 'list-with-best-vpn-service-2025' },
+        { name: 'AdBlockers', value: 'adblockers-list' }
+      )
+  );
 
-  async execute(interaction) {
+export async function execute(interaction) {
     await interaction.deferReply();
 
     const section = interaction.options.getString('section');
@@ -38,7 +37,7 @@ export default {
       if (!section) {
         // Show all sections (from homepage)
         const { data } = await axios.get(BASE_URL, { timeout: 10000 });
-        const $ = cheerio.load(data);
+        const $ = load(data);
 
         const sections = [];
         // Adjust selectors based on actual HTML structure
@@ -85,7 +84,7 @@ export default {
       // Fetch specific section page
       const url = `${BASE_URL}/${section}`;
       const { data } = await axios.get(url, { timeout: 10000 });
-      const $ = cheerio.load(data);
+      const $ = load(data);
 
       const sites = [];
       // Common patterns on such lists: often <li> or <div class="site"> with <a> and maybe <span class="desc">
@@ -164,5 +163,4 @@ export default {
         'Try again later or check manually: https://yarrlist.net'
       );
     }
-  },
-};
+}

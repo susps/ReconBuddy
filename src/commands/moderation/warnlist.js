@@ -13,8 +13,8 @@ export const data = new SlashCommandBuilder()
       .setDescription('User to check')
       .setRequired(true)
   )
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
-  
+  .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages);
+
 export async function execute(interaction) {
   const target = interaction.options.getUser('target', true);
 

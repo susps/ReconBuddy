@@ -10,7 +10,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // ─────────────────────────────────────────────────────────────────────────────
 import discord from 'discord.js';
 
-import { MongoClient, ServerApiVersion } from 'mongodb';
+// ─────────────────────────────────────────────────────────────────────────────
+// MongoDB & Mongoose
+// ─────────────────────────────────────────────────────────────────────────────
+import mongoose from 'mongoose';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Logger (structured logging)
@@ -47,7 +50,6 @@ const client = new discord.Client({
     discord.IntentsBitField.Flags.GuildMessages,
     discord.IntentsBitField.Flags.MessageContent,
     discord.IntentsBitField.Flags.GuildMessageReactions,
-    discord.IntentsBitField.Flags.GuildVoiceStates,
   ],
   partials: [
     discord.Partials.Message,
@@ -61,7 +63,7 @@ const client = new discord.Client({
 // Shared state
 client.commands = new discord.Collection();
 client.cooldowns = new discord.Collection();
-client.db = null;
+client.db = null; // Will hold Mongoose connection reference
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Loader functions
@@ -158,7 +160,7 @@ async function loadCommands() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Database (optional)
+// Database (using Mongoose)
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function initDatabase() {
@@ -170,19 +172,15 @@ async function initDatabase() {
   }
 
   try {
-    const mongo = new MongoClient(MONGODB_URI, {
-      serverApi: {
-        version: ServerApiVersion.v1,
-        strict: true,
-        deprecationErrors: true,
-      },
+    await mongoose.connect(MONGODB_URI, {
+      // Modern options (no deprecated ones)
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      family: 4, // Use IPv4, skip IPv6
     });
 
-    await mongo.connect();
-    await mongo.db().command({ ping: 1 });
-
-    client.db = mongo.db();
-    log.info('MongoDB connected');
+    client.db = mongoose.connection.db; // Raw DB reference if needed
+    log.info('MongoDB connected successfully with Mongoose');
   } catch (err) {
     log.error('MongoDB connection failed:', err.message);
     client.db = null;
@@ -205,7 +203,7 @@ async function bootstrap() {
 
   log.info(`Ready: ${eventsLoaded} events • ${commandsLoaded} commands`);
 
-  // Start status rotation (after login)
+  // Start status rotation
   const { startStatusRotation } = await import('./utils/statusRotator.js');
   startStatusRotation(client);
 

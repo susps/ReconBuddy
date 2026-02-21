@@ -1,20 +1,19 @@
 ﻿import { SlashCommandBuilder } from 'discord.js';
 import ms from 'ms';  // Ensure the 'ms' package is installed (npm install ms)
 
-export default {
-    data: new SlashCommandBuilder()
-        .setName('remindme')
-        .setDescription('Sets a reminder for a specified duration.')
-        .addStringOption(option =>
-            option.setName('time')
-                .setDescription('Time after which you want to be reminded (e.g., 10m, 1h, 2d).')
-                .setRequired(true))
-        .addStringOption(option =>
-            option.setName('reminder')
-                .setDescription('What would you like to be reminded of?')
-                .setRequired(true)),
+export const data = new SlashCommandBuilder()
+    .setName('remindme')
+    .setDescription('Sets a reminder for a specified duration.')
+    .addStringOption(option =>
+        option.setName('time')
+            .setDescription('Time after which you want to be reminded (e.g., 10m, 1h, 2d).')
+            .setRequired(true))
+    .addStringOption(option =>
+        option.setName('reminder')
+            .setDescription('What would you like to be reminded of?')
+            .setRequired(true));
 
-    async execute(interaction) {
+export async function execute(interaction) {
         const timeInput = interaction.options.getString('time');
         const reminder = interaction.options.getString('reminder');
 
@@ -27,9 +26,8 @@ export default {
         // Confirm the reminder has been set
         await interaction.reply({ content: `I will remind you about: "${reminder}" in ${timeInput}.`, ephemeral: true });
 
-        // Wait for the specified duration before reminding the user
-        setTimeout(() => {
-            interaction.user.send(`⏰ **Reminder**: ${reminder}`);
-        }, timeMs);
-    },
-};
+    // Wait for the specified duration before reminding the user
+    setTimeout(() => {
+        interaction.user.send(`⏰ **Reminder**: ${reminder}`);
+    }, timeMs);
+}

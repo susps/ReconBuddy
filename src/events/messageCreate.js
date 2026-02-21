@@ -1,7 +1,8 @@
 // src/events/messageCreate.js
-import { Events } from 'discord.js';
+import { Events, EmbedBuilder } from 'discord.js';
 import fs from 'node:fs';
 import path from 'node:path';
+import { checkMessageRateLimit } from '../services/antiSpam.js';
 
 export const name = Events.MessageCreate;
 export const once = false;
