@@ -24,6 +24,7 @@
     "axios": "^1.13.5",
     "canvas": "^3.2.1",
     "cheerio": "^1.2.0",
+    "cron": "^4.4.0",
     "discord-api-types": "^0.38.38",
     "discord.js": "^14.25.1",
     "dotenv": "^17.2.4",
