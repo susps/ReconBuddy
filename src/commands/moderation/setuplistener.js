@@ -109,11 +109,11 @@ export async function execute(interaction) {
   const enable = interaction.options.getBoolean('enable') ?? true;
 
   if (!validEvents.includes(eventName)) {
-    return interaction.reply({ content: 'Invalid event selected.', ephemeral: true });
+    return interaction.reply({ content: 'Invalid event selected.', flags: 64 });
   }
 
   if (![0, 5, 11, 12, 13, 15].includes(logChannel.type)) {
-    return interaction.reply({ content: 'Please select a text-based channel.', ephemeral: true });
+    return interaction.reply({ content: 'Please select a text-based channel.', flags: 64 });
   }
 
   const listenersFile = path.join(process.cwd(), 'listeners.json');
@@ -140,7 +140,7 @@ export async function execute(interaction) {
     fs.writeFileSync(listenersFile, JSON.stringify(listeners, null, 2));
   } catch (err) {
     console.error('Failed to save listener config:', err);
-    return interaction.reply({ content: 'Failed to save configuration.', ephemeral: true });
+    return interaction.reply({ content: 'Failed to save configuration.', flags: 64 });
   }
 
   const embed = new EmbedBuilder()
@@ -168,7 +168,7 @@ export async function execute(interaction) {
   await interaction.reply({
     embeds: [embed],
     components: [row],
-    ephemeral: true,
+    flags: 64,
   });
 }
 

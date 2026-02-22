@@ -27,12 +27,12 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: false });
+  await interaction.deferReply();
 
   const bet = interaction.options.getInteger('bet', true);
 
   if (bet < 1 || bet > 500) {
-    return interaction.editReply({ content: 'Bet must be between 1 and 500 NEXI Coins.', ephemeral: true });
+    return interaction.editReply({ content: 'Bet must be between 1 and 500 NEXI Coins.', flags: 64 });
   }
 
   const user = await getUser(interaction.user.id, interaction.user.username);
@@ -40,7 +40,7 @@ export async function execute(interaction) {
   if (user.balance < bet) {
     return interaction.editReply({
       content: `You only have **${user.balance.toLocaleString()}** NEXI Coins. You can't afford this bet.`,
-      ephemeral: true,
+      flags: 64,
     });
   }
 
@@ -50,7 +50,7 @@ export async function execute(interaction) {
     const remaining = Math.ceil((COOLDOWN_MS - (now - user.lastSlots)) / 1000);
     return interaction.editReply({
       content: `Slow down! You can spin again in **${remaining} seconds**.`,
-      ephemeral: true,
+      flags: 64,
     });
   }
 

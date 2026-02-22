@@ -13,7 +13,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   try {
     const target = interaction.options.getUser('user') || interaction.user;
@@ -34,6 +34,6 @@ export async function execute(interaction) {
     await interaction.editReply({ embeds: [embed] });
   } catch (err) {
     console.error('Balance command error:', err);
-    await interaction.editReply({ content: 'Failed to fetch balance.', ephemeral: true });
+    await interaction.editReply({ content: 'Failed to fetch balance.', flags: 64 });
   }
 }

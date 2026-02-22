@@ -7,7 +7,7 @@ export const data = new SlashCommandBuilder()
   .setDescription('Work for some NEXI Coins (30-minute cooldown)');
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   try {
     const earned = await work(interaction.user.id, interaction.user.username);  // ← pass username
@@ -22,6 +22,6 @@ export async function execute(interaction) {
 
     await interaction.editReply({ embeds: [embed] });
   } catch (err) {
-    await interaction.editReply({ content: err.message, ephemeral: true });
+    await interaction.editReply({ content: err.message, flags: 64 });
   }
 }

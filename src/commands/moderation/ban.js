@@ -31,7 +31,7 @@ export async function execute(interaction) {
 
   const member = await interaction.guild.members.fetch(target.id).catch(() => null);
   if (member && !member.bannable) {
-    return interaction.reply({ content: 'I cannot ban this user (higher role or missing perms).', ephemeral: true });
+    return interaction.reply({ content: 'I cannot ban this user (higher role or missing perms).', flags: 64 });
   }
 
   try {
@@ -54,6 +54,6 @@ export async function execute(interaction) {
     await interaction.reply({ embeds: [embed] });
   } catch (err) {
     console.error(err);
-    await interaction.reply({ content: 'Failed to ban member. Check permissions.', ephemeral: true });
+    await interaction.reply({ content: 'Failed to ban member. Check permissions.', flags: 64 });
   }
 }

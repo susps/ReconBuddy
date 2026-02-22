@@ -21,7 +21,7 @@ export async function execute(interaction) {
     if (!targetMember) {
         return interaction.reply({
             content: "Unable to find the target member.",
-            ephemeral: true
+            flags: 64
         }).catch(console.error);
     }
 
@@ -29,7 +29,7 @@ export async function execute(interaction) {
     if (!interaction.guild.members.me.permissions.has(PermissionsBitField.Flags.MoveMembers)) {
         return interaction.reply({
             content: "I don't have permission to move members.",
-            ephemeral: true
+            flags: 64
         }).catch(console.error);
     }
 
@@ -38,21 +38,21 @@ export async function execute(interaction) {
     if (!isSelfMove && !interaction.member.permissions.has(PermissionsBitField.Flags.MoveMembers)) {
         return interaction.reply({
             content: "You don't have permission to move other members.",
-            ephemeral: true
+            flags: 64
         }).catch(console.error);
     }
 
     if (!targetMember.voice?.channel) {
         return interaction.reply({
             content: "The target user is not in a voice channel.",
-            ephemeral: true
+            flags: 64
         }).catch(console.error);
     }
 
     if (targetMember.voice.channel.id === channel.id) {
         return interaction.reply({
             content: "The target user is already in that channel.",
-            ephemeral: true
+            flags: 64
         }).catch(console.error);
     }
 
@@ -60,13 +60,13 @@ export async function execute(interaction) {
         await targetMember.voice.setChannel(channel);
         await interaction.reply({
             content: `Moved ${targetUser.tag} to ${channel.name}.`,
-            ephemeral: true
+            flags: 64
         }).catch(console.error);
     } catch (error) {
         console.error("Failed to move user:", error);
         await interaction.reply({
             content: "Failed to move the user. Check bot permissions (e.g., MOVE_MEMBERS) or channel access.",
-            ephemeral: true
+            flags: 64
         }).catch(console.error);
     }
 }

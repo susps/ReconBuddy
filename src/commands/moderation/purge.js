@@ -45,7 +45,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   const amount = interaction.options.getInteger('amount', true);
   const targetUser = interaction.options.getUser('user');
@@ -63,7 +63,7 @@ export async function execute(interaction) {
   try {
     messages = await interaction.channel.messages.fetch({ limit: amount });
   } catch (err) {
-    return interaction.editReply({ content: 'Could not fetch messages.', ephemeral: true });
+    return interaction.editReply({ content: 'Could not fetch messages.', flags: 64 });
   }
 
   // Apply filters

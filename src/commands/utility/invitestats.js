@@ -7,7 +7,7 @@ export const data = new SlashCommandBuilder()
   .setDescription('View invite leaderboard and stats for this server');
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: false });
+  await interaction.deferReply();
 
   const guildId = interaction.guild.id;
 

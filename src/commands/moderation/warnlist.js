@@ -20,20 +20,20 @@ export async function execute(interaction) {
 
   const file = path.join(process.cwd(), 'warnings.json');
   if (!fs.existsSync(file)) {
-    return interaction.reply({ content: 'No warnings have been issued yet.', ephemeral: true });
+    return interaction.reply({ content: 'No warnings have been issued yet.', flags: 64 });
   }
 
   let data;
   try {
     data = JSON.parse(fs.readFileSync(file, 'utf-8'));
   } catch {
-    return interaction.reply({ content: 'Failed to read warnings database.', ephemeral: true });
+    return interaction.reply({ content: 'Failed to read warnings database.', flags: 64 });
   }
 
   const warns = data[target.id] || [];
 
   if (warns.length === 0) {
-    return interaction.reply({ content: `${target.tag} has no warnings.`, ephemeral: true });
+    return interaction.reply({ content: `${target.tag} has no warnings.`, flags: 64 });
   }
 
   let description = `Warnings for **${target.tag}** (${target.id}):\n\n`;
@@ -43,5 +43,5 @@ export async function execute(interaction) {
     description += `Reason: ${w.reason}\n\n`;
   });
 
-  return interaction.reply({ embeds: [{ description }], ephemeral: true });
+  return interaction.reply({ embeds: [{ description }], flags: 64 });
 }

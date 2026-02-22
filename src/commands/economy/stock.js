@@ -61,7 +61,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   const sub = interaction.options.getSubcommand();
   const ticker = interaction.options.getString('ticker')?.toUpperCase();
@@ -153,7 +153,7 @@ export async function execute(interaction) {
 
     const user = await getUser(interaction.user.id, interaction.user.username);
     if (user.balance < cost) {
-      return interaction.editReply({ content: `Not enough coins. You have $${user.balance.toLocaleString()}, need $${cost.toLocaleString()}.`, ephemeral: true });
+      return interaction.editReply({ content: `Not enough coins. You have $${user.balance.toLocaleString()}, need $${cost.toLocaleString()}.`, flags: 64 });
     }
 
     const { cost: paidCost, newBalance } = await buyStock(interaction.user.id, interaction.user.username, ticker, quantity);
@@ -217,7 +217,7 @@ export async function execute(interaction) {
   if (sub === 'chart') {
     const stock = await getStock(ticker);
     if (!stock || stock.history.length < 2) {
-      return interaction.editReply({ content: 'Not enough price history for this stock.', ephemeral: true });
+      return interaction.editReply({ content: 'Not enough price history for this stock.', flags: 64 });
     }
 
     const history = stock.history.slice(-10); // last 10 updates for readability

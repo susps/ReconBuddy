@@ -45,7 +45,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   const guildId = interaction.guild.id;
   let config = getGuildConfig(guildId);

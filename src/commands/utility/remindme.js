@@ -20,11 +20,11 @@ export async function execute(interaction) {
         // Convert the provided time to milliseconds
         const timeMs = ms(timeInput);
         if (!timeMs || timeMs <= 0) {
-            return interaction.reply({ content: `Invalid time format. Please provide a valid time (e.g., 10m, 1h, 2d).`, ephemeral: true });
+            return interaction.reply({ content: `Invalid time format. Please provide a valid time (e.g., 10m, 1h, 2d).`, flags: 64 });
         }
 
         // Confirm the reminder has been set
-        await interaction.reply({ content: `I will remind you about: "${reminder}" in ${timeInput}.`, ephemeral: true });
+        await interaction.reply({ content: `I will remind you about: "${reminder}" in ${timeInput}.`, flags: 64 });
 
     // Wait for the specified duration before reminding the user
     setTimeout(() => {

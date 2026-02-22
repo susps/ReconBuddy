@@ -10,64 +10,37 @@ import logger from '../utils/logger.js';
 // Initialize default stocks on startup
 export async function initStocks() {
   try {
-    logger.info('[STOCK] Checking for existing stocks...');
-    const existing = await Stock.findOne({ ticker: 'NEXI' });
-    
-    if (!existing) {
-      logger.info('[STOCK] No stocks found. Creating default stocks...');
-      await Stock.create({
+    logger.info('[STOCK] Ensuring default stocks exist...');
+
+    const defaults = [
+      {
         ticker: 'NEXI',
         name: 'NEXI Coin',
         price: 150,
         volatility: 0.12,
         factors: { memberGrowth: 0.15, messageActivity: 0.25 },
-      });
-      await Stock.create({
-        ticker: 'TECH',
-        name: 'Tech Giants Inc.',
-        price: 300,
-        volatility: 0.08,
-      });
-      await Stock.create({
-        ticker: 'GME',
-        name: 'GameStop Corp.',
-        price: 50,
-        volatility: 0.2,
-      });
-      await Stock.create({
-        ticker: 'CRYPTO',
-        name: 'Crypto Index',
-        price: 200,
-        volatility: 0.15,
-      });
-      await Stock.create({
-        ticker: 'RETAIL',
-        name: 'Retail Leaders',
-        price: 80,
-        volatility: 0.1,
-      });
-      await Stock.create({
-        ticker: 'ENERGY',
-        name: 'Energy Co.',
-        price: 120,
-        volatility: 0.09,
-      });
-      await Stock.create({
-        ticker: 'HEALTH',
-        name: 'Health Corp.',
-        price: 90,
-        volatility: 0.07,
-      });
-      await Stock.create({
-        ticker: 'FINANCE',
-        name: 'Finance Group',
-        price: 110,
-        volatility: 0.06,
-      });
-      logger.info('[STOCK] ✓ Default stocks initialized (8 new stocks created)');
-    } else {
-      logger.info('[STOCK] Stocks already exist in database, skipping initialization');
+      },
+      { ticker: 'TECH', name: 'Tech Giants Inc.', price: 300, volatility: 0.08 },
+      { ticker: 'GME', name: 'GameStop Corp.', price: 50, volatility: 0.2 },
+      { ticker: 'CRYPTO', name: 'Crypto Index', price: 200, volatility: 0.15 },
+      { ticker: 'RETAIL', name: 'Retail Leaders', price: 80, volatility: 0.1 },
+      { ticker: 'ENERGY', name: 'Energy Co.', price: 120, volatility: 0.09 },
+      { ticker: 'HEALTH', name: 'Health Corp.', price: 90, volatility: 0.07 },
+      { ticker: 'FINANCE', name: 'Finance Group', price: 110, volatility: 0.06 },
+    ];
+
+    let created = 0;
+    for (const def of defaults) {
+      const found = await Stock.findOne({ ticker: def.ticker });
+      if (!found) {
+        await Stock.create(def);
+        created++;
+        logger.info(`[STOCK] Created default stock ${def.ticker}`);
+      }
     }
+
+    if (created === 0) logger.info('[STOCK] All default stocks already exist, skipping creation');
+    else logger.info(`[STOCK] ✓ Default stocks initialized (${created} created)`);
   } catch (error) {
     logger.error('[STOCK] Error initializing stocks:', error);
   }
@@ -77,49 +50,69 @@ export async function initStocks() {
 export async function updateAllPrices(client) {
   const stocks = await Stock.find({});
 
+  // Gather server/global metrics once per tick (used as market signals)
+  const totalMembers = client.guilds.cache.reduce((acc, g) => acc + g.memberCount, 0);
+  const onlineMembers = client.guilds.cache.reduce((acc, g) => acc + g.members.cache.filter(m => m.presence?.status === 'online').size, 0);
+  const totalGuilds = client.guilds.cache.size;
+  const textChannels = client.channels.cache.filter(c => c.isTextBased()).size;
+
   for (const stock of stocks) {
     let newPrice = stock.price;
 
-    // Random fluctuation
-    const fluctuation = (Math.random() - 0.5) * stock.volatility * newPrice;
-    newPrice += fluctuation;
+    // Configuration: caps and scaling
+    const MAX_PCT_CHANGE = 0.05; // max 5% per tick
+    const MIN_PRICE = 1;
 
-    // NEXI special: server variables (advanced calculation)
-    if (stock.ticker === 'NEXI') {
-      // Get current metrics
-      const totalMembers = client.guilds.cache.reduce((acc, g) => acc + g.memberCount, 0);
-      const onlineMembers = client.guilds.cache.reduce((acc, g) => acc + g.members.cache.filter(m => m.presence?.status === 'online').size, 0);
-      const totalGuilds = client.guilds.cache.size;
-      const textChannels = client.channels.cache.filter(c => c.isTextBased()).size;
-      
-      // Get previous metrics (store in stock.metadata if available)
-      const prevMembers = stock.metadata?.prevMembers || totalMembers;
-      const prevGuilds = stock.metadata?.prevGuilds || totalGuilds;
-      
-      // Calculate deltas (rates of change)
-      const memberDelta = totalMembers - prevMembers;
-      const guildDelta = totalGuilds - prevGuilds;
-      const onlineRatio = totalMembers > 0 ? onlineMembers / totalMembers : 0;
-      
-      // Advanced weighted factors
-      const memberGrowthImpact = (memberDelta / Math.max(1, prevMembers)) * stock.factors.memberGrowth * (stock.price * 0.05);
-      const guildGrowthImpact = (guildDelta / Math.max(1, prevGuilds)) * 0.1 * (stock.price * 0.03);
-      const engagementImpact = onlineRatio * 0.15 * (stock.price * 0.02);
-      const channelActivityImpact = (textChannels / Math.max(1, totalGuilds)) * stock.factors.messageActivity * (stock.price * 0.02);
-      
-      // Apply momentum (dampen extreme changes)
-      const totalImpact = memberGrowthImpact + guildGrowthImpact + engagementImpact + channelActivityImpact;
-      const cappedImpact = Math.max(-stock.price * 0.1, Math.min(stock.price * 0.1, totalImpact));
-      
-      newPrice += cappedImpact;
-      
-      // Update metadata for next calculation
-      stock.metadata = {
-        prevMembers: totalMembers,
-        prevGuilds: totalGuilds,
-        lastEngagementRatio: onlineRatio
-      };
+    // Base random fluctuation (percent-based)
+    const baseFluctuationPct = (Math.random() - 0.5) * (stock.volatility || 0.1);
+    newPrice = Math.max(MIN_PRICE, newPrice * (1 + baseFluctuationPct));
+
+    // Market signal calculation (applies to all stocks)
+    // Get previous metrics (store in stock.metadata if available)
+    const prevMembers = stock.metadata?.prevMembers || totalMembers;
+    const prevGuilds = stock.metadata?.prevGuilds || totalGuilds;
+
+    // Calculate deltas (rates of change)
+    const memberDelta = totalMembers - prevMembers;
+    const guildDelta = totalGuilds - prevGuilds;
+    const onlineRatio = totalMembers > 0 ? onlineMembers / totalMembers : 0;
+
+    // Convert impacts to percentage-of-price (so large prices don't explode)
+    const memberGrowthFactor = stock.factors?.memberGrowth || 0.02; // smaller default for non-community stocks
+    const messageActivityFactor = stock.factors?.messageActivity || 0.02;
+
+    const memberGrowthPct = (memberDelta / Math.max(1, prevMembers)) * memberGrowthFactor * 0.05;
+    const guildGrowthPct = (guildDelta / Math.max(1, prevGuilds)) * 0.03;
+    const engagementPct = onlineRatio * 0.02;
+    const channelActivityPct = (textChannels / Math.max(1, totalGuilds)) * messageActivityFactor * 0.02;
+
+    // Aggregate percentage impact
+    let totalImpactPct = memberGrowthPct + guildGrowthPct + engagementPct + channelActivityPct;
+
+    // Mean reversion: if price is far above recent average, apply negative pressure (and vice-versa)
+    const histPrices = stock.history?.map(h => h.price) || [];
+    if (histPrices.length >= 3) {
+      const avg = histPrices.reduce((a, b) => a + b, 0) / histPrices.length;
+      const deviation = (stock.price - avg) / Math.max(1, avg);
+      // Apply a small opposing force proportional to deviation
+      totalImpactPct += -Math.sign(deviation) * Math.min(0.02, Math.abs(deviation) * 0.05);
     }
+
+    // Liquidity scaling: higher-priced / low-liquidity assets should move less
+    const liquidityScale = 1 / (1 + Math.log10(Math.max(1, stock.price)));
+    totalImpactPct *= liquidityScale;
+
+    // Cap impact to configured max per tick
+    const cappedPct = Math.max(-MAX_PCT_CHANGE, Math.min(MAX_PCT_CHANGE, totalImpactPct));
+
+    newPrice = Math.max(MIN_PRICE, Math.round(newPrice * (1 + cappedPct)));
+
+    // Update metadata for next calculation
+    stock.metadata = {
+      prevMembers: totalMembers,
+      prevGuilds: totalGuilds,
+      lastEngagementRatio: onlineRatio,
+    };
 
     newPrice = Math.max(1, Math.round(newPrice));
 
@@ -138,13 +131,14 @@ export async function updateAllPrices(client) {
 
 // Start hourly price updates
 export function startPriceUpdates(client) {
-  cron.schedule('* * * * *', async () => {
+  // Run at the top of every hour to prevent runaway minute-by-minute compounding
+  cron.schedule('0 * * * *', async () => {
     logger.info('[STOCK CRON] Starting price update...');
     await updateAllPrices(client);
     logger.info('[STOCK CRON] Update complete');
   });
 
-  logger.info('[STOCK] Price update cron scheduled (every minute)');
+  logger.info('[STOCK] Price update cron scheduled (hourly)');
 }
 
 // Get single stock

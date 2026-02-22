@@ -9,7 +9,7 @@ export const data = new SlashCommandBuilder()
   .setDescription('Top 10 richest users in the server');
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: false });
+  await interaction.deferReply();
 
   try {
     const users = await User.find({}).sort({ balance: -1 });
@@ -80,6 +80,6 @@ export async function execute(interaction) {
     await interaction.editReply({ embeds: embeds });
   } catch (err) {
     console.error('Leaderboard error:', err);
-    await interaction.editReply({ content: 'Failed to fetch leaderboard.', ephemeral: true });
+    await interaction.editReply({ content: 'Failed to fetch leaderboard.', flags: 64 });
   }
 }

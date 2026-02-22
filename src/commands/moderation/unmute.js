@@ -22,11 +22,11 @@ export async function execute(interaction) {
   const reason = interaction.options.getString('reason') || 'No reason provided';
 
   if (!target) {
-    return interaction.reply({ content: 'Could not find that member.', ephemeral: true });
+    return interaction.reply({ content: 'Could not find that member.', flags: 64 });
   }
 
   if (!target.isCommunicationDisabled()) {
-    return interaction.reply({ content: 'This member is not timed out.', ephemeral: true });
+    return interaction.reply({ content: 'This member is not timed out.', flags: 64 });
   }
 
   try {
@@ -45,6 +45,6 @@ export async function execute(interaction) {
     await interaction.reply({ embeds: [embed] });
   } catch (err) {
     console.error(err);
-    await interaction.reply({ content: 'Failed to unmute member. Check permissions.', ephemeral: true });
+    await interaction.reply({ content: 'Failed to unmute member. Check permissions.', flags: 64 });
   }
 }

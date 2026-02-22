@@ -28,16 +28,16 @@ export async function execute(interaction) {
   const reason = interaction.options.getString('reason', true);
 
   if (target.id === interaction.user.id) {
-    return interaction.reply({ content: 'You cannot warn yourself.', ephemeral: true });
+    return interaction.reply({ content: 'You cannot warn yourself.', flags: 64 });
   }
 
   if (target.bot) {
-    return interaction.reply({ content: 'You cannot warn bots.', ephemeral: true });
+    return interaction.reply({ content: 'You cannot warn bots.', flags: 64 });
   }
 
   const member = await interaction.guild.members.fetch(target.id).catch(() => null);
   if (member && !member.manageable) {
-    return interaction.reply({ content: 'I cannot warn this user (higher role / missing perms).', ephemeral: true });
+    return interaction.reply({ content: 'I cannot warn this user (higher role / missing perms).', flags: 64 });
   }
 
   const file = path.join(process.cwd(), 'warnings.json');
@@ -63,7 +63,7 @@ export async function execute(interaction) {
     fs.writeFileSync(file, JSON.stringify(data, null, 2));
   } catch (err) {
     console.error('Failed to save warning:', err);
-    return interaction.reply({ content: 'Failed to save warning.', ephemeral: true });
+    return interaction.reply({ content: 'Failed to save warning.', flags: 64 });
   }
 
   // Log to txt
@@ -78,5 +78,5 @@ export async function execute(interaction) {
     msg += `\n⚠️ Reaching ${MAX_WARNINGS} warnings — consider further action.`;
   }
 
-  return interaction.reply({ content: msg, ephemeral: true });
+  return interaction.reply({ content: msg, flags: 64 });
 }

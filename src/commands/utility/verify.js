@@ -8,7 +8,7 @@ export const data = new SlashCommandBuilder()
   .setDMPermission(false);
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true }).catch(() => {});
+  await interaction.deferReply({ flags: 64 }).catch(() => {});
 
   try {
     const config = await loadWelcomeConfig();

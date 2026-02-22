@@ -144,10 +144,10 @@ export async function execute(interaction) {
   // Owner-only check (adjust to your preferred method)
   const ownerIds = process.env.OWNER_IDS?.split(',')?.map(id => id.trim()) || [];
   if (!ownerIds.includes(interaction.user.id)) {
-    return interaction.reply({ content: 'This command is restricted to bot owners only.', ephemeral: true });
+    return interaction.reply({ content: 'This command is restricted to bot owners only.', flags: 64 });
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   const guildId = interaction.guild.id;
   let config = getGuildConfig(guildId);

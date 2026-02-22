@@ -7,7 +7,7 @@ export const data = new SlashCommandBuilder()
   .setDescription('Claim your daily NEXI Coins reward');
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   try {
     const result = await claimDaily(interaction.user.id, interaction.user.username);
@@ -28,6 +28,6 @@ export async function execute(interaction) {
 
     await interaction.editReply({ embeds: [embed] });
   } catch (err) {
-    await interaction.editReply({ content: err.message, ephemeral: true });
+    await interaction.editReply({ content: err.message, flags: 64 });
   }
 }

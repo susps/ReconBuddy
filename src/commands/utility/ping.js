@@ -6,7 +6,7 @@ export const data = new SlashCommandBuilder()
   .setDescription('Checks the bot\'s latency and response time');
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   const sent = await interaction.editReply({
     content: 'Pinging...',

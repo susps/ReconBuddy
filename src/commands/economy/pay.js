@@ -20,13 +20,14 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  // Defer to allow async work and use editReply safely
+  await interaction.deferReply();
 
   const target = interaction.options.getUser('user', true);
   const amount = interaction.options.getInteger('amount', true);
 
   if (target.id === interaction.user.id) {
-    return interaction.editReply({ content: 'You cannot pay yourself.', ephemeral: true });
+    return interaction.editReply({ content: 'You cannot pay yourself.' });
   }
 
   try {
@@ -51,6 +52,6 @@ export async function execute(interaction) {
 
     await interaction.editReply({ embeds: [embed] });
   } catch (err) {
-    await interaction.editReply({ content: err.message, ephemeral: true });
+    await interaction.editReply({ content: err.message, flags: 64 });
   }
 }

@@ -7,6 +7,6 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction) {
     await interaction.reply({
         content: "This is a template command. Copy this file and edit it to create new commands.",
-        ephemeral: true,
+        flags: 64,
     }).catch(() => { });
 }

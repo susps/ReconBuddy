@@ -1,0 +1,18 @@
+{
+  "1289048492375019541": {
+    "join": {
+      "enabled": false,
+      "maxJoins": 5,
+      "timeWindow": 60000,
+      "action": "kick",
+      "timeoutDuration": 600000
+    },
+    "message": {
+      "enabled": false,
+      "maxMessages": 8,
+      "timeWindow": 10000,
+      "action": "mute",
+      "muteDuration": 300000
+    }
+  }
+}

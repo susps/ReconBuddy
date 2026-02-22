@@ -111,7 +111,7 @@ export async function handleComponent(interaction, client) {
 
     const fallbackReply = {
       content: 'Something went wrong while processing this component.',
-      ephemeral: true,
+      flags: 64,
     };
 
     if (interaction.deferred || interaction.replied) {

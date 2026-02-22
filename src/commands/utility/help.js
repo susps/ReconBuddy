@@ -16,7 +16,7 @@ export const data = new SlashCommandBuilder()
 const COMMANDS_PER_PAGE = 10;
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   const commandName = interaction.options.getString('command')?.toLowerCase();
 
@@ -84,7 +84,7 @@ export async function execute(interaction) {
   commandsByCategory.forEach(cmds => allCommands.push(...cmds));
 
   if (allCommands.length === 0) {
-    return interaction.editReply({ content: 'No commands loaded yet.', ephemeral: true });
+    return interaction.editReply({ content: 'No commands loaded yet.', flags: 64 });
   }
 
   const totalPages = Math.ceil(allCommands.length / COMMANDS_PER_PAGE);

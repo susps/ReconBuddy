@@ -12,7 +12,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   const targetUser = interaction.options.getUser('user') || interaction.user;
   const member = interaction.guild?.members.cache.get(targetUser.id) || null;

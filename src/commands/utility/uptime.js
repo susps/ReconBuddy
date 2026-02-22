@@ -6,7 +6,7 @@ export const data = new SlashCommandBuilder()
   .setDescription('Shows how long the bot has been running');
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   const uptime = process.uptime();
   const days = Math.floor(uptime / 86400);

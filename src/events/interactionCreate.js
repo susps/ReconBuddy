@@ -17,7 +17,7 @@ export async function execute(interaction, client) {
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({
           content: 'Command not implemented yet.',
-          ephemeral: true,
+          flags: 64,
         }).catch(() => {});
       }
       return;
@@ -30,7 +30,7 @@ export async function execute(interaction, client) {
 
       const errorReply = {
         content: 'There was an error executing this command.',
-        ephemeral: true,
+        flags: 64,
       };
 
       if (interaction.replied || interaction.deferred) {
@@ -64,7 +64,7 @@ export async function execute(interaction, client) {
       if (!interaction.deferred && !interaction.replied) {
         await interaction.reply({
           content: 'This component is not handled yet.',
-          ephemeral: true,
+          flags: 64,
         }).catch(() => {});
       }
     }

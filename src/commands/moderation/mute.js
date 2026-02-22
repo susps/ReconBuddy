@@ -28,25 +28,25 @@ export async function execute(interaction) {
   const reason = interaction.options.getString('reason') || 'No reason provided';
 
   if (!target) {
-    return interaction.reply({ content: 'Could not find that member.', ephemeral: true });
+    return interaction.reply({ content: 'Could not find that member.', flags: 64 });
   }
 
   if (target.id === interaction.user.id) {
-    return interaction.reply({ content: 'You cannot mute yourself.', ephemeral: true });
+    return interaction.reply({ content: 'You cannot mute yourself.', flags: 64 });
   }
 
   if (target.user.bot) {
-    return interaction.reply({ content: 'Cannot mute bots with this command.', ephemeral: true });
+    return interaction.reply({ content: 'Cannot mute bots with this command.', flags: 64 });
   }
 
   if (!target.manageable) {
-    return interaction.reply({ content: 'I cannot mute this member (higher role or missing perms).', ephemeral: true });
+    return interaction.reply({ content: 'I cannot mute this member (higher role or missing perms).', flags: 64 });
   }
 
   // Simple duration parser (you can use ms library if installed)
   const durationMs = parseDuration(durationStr);
   if (!durationMs || durationMs <= 0) {
-    return interaction.reply({ content: 'Invalid duration format. Examples: 30m, 2h, 1d', ephemeral: true });
+    return interaction.reply({ content: 'Invalid duration format. Examples: 30m, 2h, 1d', flags: 64 });
   }
 
   try {
@@ -66,7 +66,7 @@ export async function execute(interaction) {
     await interaction.reply({ embeds: [embed] });
   } catch (err) {
     console.error(err);
-    await interaction.reply({ content: 'Failed to mute member. Check permissions.', ephemeral: true });
+    await interaction.reply({ content: 'Failed to mute member. Check permissions.', flags: 64 });
   }
 }
 

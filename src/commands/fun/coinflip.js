@@ -48,11 +48,11 @@ export async function execute(interaction) {
 
   // ─── Bet flip ───────────────────────────────────────────────────────────
   if (opponent.bot) {
-    return interaction.editReply({ content: 'You cannot bet against bots.', ephemeral: true });
+    return interaction.editReply({ content: 'You cannot bet against bots.', flags: 64 });
   }
 
   if (opponent.id === interaction.user.id) {
-    return interaction.editReply({ content: 'You cannot bet against yourself.', ephemeral: true });
+    return interaction.editReply({ content: 'You cannot bet against yourself.', flags: 64 });
   }
 
   const challenger = interaction.user;
@@ -60,11 +60,11 @@ export async function execute(interaction) {
   const opponentUser = await getUser(opponent.id, opponent.username);
 
   if (challengerUser.balance < amount) {
-    return interaction.editReply({ content: 'You do not have enough NEXI Coins for this bet.', ephemeral: true });
+    return interaction.editReply({ content: 'You do not have enough NEXI Coins for this bet.', flags: 64 });
   }
 
   if (opponentUser.balance < amount) {
-    return interaction.editReply({ content: `${opponent.tag} does not have enough NEXI Coins for this bet.`, ephemeral: true });
+    return interaction.editReply({ content: `${opponent.tag} does not have enough NEXI Coins for this bet.`, flags: 64 });
   }
 
   // Generate unique bet ID for button customIds

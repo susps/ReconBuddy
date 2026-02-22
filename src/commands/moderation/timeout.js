@@ -28,24 +28,24 @@ export async function execute(interaction) {
   const reason = interaction.options.getString('reason') || 'No reason provided';
 
   if (!target) {
-    return interaction.reply({ content: 'Could not find that member.', ephemeral: true });
+    return interaction.reply({ content: 'Could not find that member.', flags: 64 });
   }
 
   if (target.id === interaction.user.id) {
-    return interaction.reply({ content: 'You cannot timeout yourself.', ephemeral: true });
+    return interaction.reply({ content: 'You cannot timeout yourself.', flags: 64 });
   }
 
   if (target.user.bot) {
-    return interaction.reply({ content: 'Cannot timeout bots with this command.', ephemeral: true });
+    return interaction.reply({ content: 'Cannot timeout bots with this command.', flags: 64 });
   }
 
   if (!target.manageable) {
-    return interaction.reply({ content: 'I cannot timeout this member.', ephemeral: true });
+    return interaction.reply({ content: 'I cannot timeout this member.', flags: 64 });
   }
 
   const durationMs = parseDuration(durationStr);
   if (!durationMs || durationMs <= 0 || durationMs > 28 * 24 * 60 * 60 * 1000) {
-    return interaction.reply({ content: 'Duration must be between 1 second and 28 days. Examples: 30m, 2h, 1d', ephemeral: true });
+    return interaction.reply({ content: 'Duration must be between 1 second and 28 days. Examples: 30m, 2h, 1d', flags: 64 });
   }
 
   try {
@@ -65,7 +65,7 @@ export async function execute(interaction) {
     await interaction.reply({ embeds: [embed] });
   } catch (err) {
     console.error(err);
-    await interaction.reply({ content: 'Failed to timeout member. Check permissions.', ephemeral: true });
+    await interaction.reply({ content: 'Failed to timeout member. Check permissions.', flags: 64 });
   }
 }
 

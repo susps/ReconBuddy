@@ -91,11 +91,11 @@ export async function closeTicket(interaction, config) {
   const channel = interaction.channel;
 
   if (!channel.name.startsWith('ticket-')) {
-    return interaction.reply({ content: 'This can only be used in ticket channels.', ephemeral: true });
+    return interaction.reply({ content: 'This can only be used in ticket channels.', flags: 64 });
   }
 
   // Send message using followUp (since deferred, can't reply/update again)
-  await interaction.followUp({ content: 'Closing ticket in 5 seconds...', ephemeral: true }).catch(() => {});
+  await interaction.followUp({ content: 'Closing ticket in 5 seconds...', flags: 64 }).catch(() => {});
 
   setTimeout(async () => {
     if (config.logChannelId) {

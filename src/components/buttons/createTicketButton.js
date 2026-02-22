@@ -5,7 +5,7 @@ import { getGuildConfig } from '../../services/ticket.js';
 export const customId = 'create_ticket_button';
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   const config = getGuildConfig(interaction.guildId);
 

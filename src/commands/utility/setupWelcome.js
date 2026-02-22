@@ -122,10 +122,10 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction) {
   // Only admins
   if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-    return interaction.reply({ content: 'You need Administrator permission to use this command.', ephemeral: true });
+    return interaction.reply({ content: 'You need Administrator permission to use this command.', flags: 64 });
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   let config = await loadWelcomeConfig();
 

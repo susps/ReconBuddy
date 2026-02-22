@@ -9,6 +9,6 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction) {
   await interaction.reply({
     content: 'Test command works! Bot is responding to slash commands.',
-    ephemeral: true,
+    flags: 64,
   }).catch(() => { });
 }

@@ -8,19 +8,19 @@ export const data = new SlashCommandBuilder()
   .setDescription('Create a private support ticket')
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   const config = getGuildConfig(interaction.guildId);
 
   if (!config.staffRoleId) {
-    return interaction.editReply({ content: 'Ticket system is not configured yet.', ephemeral: true });
+    return interaction.editReply({ content: 'Ticket system is not configured yet.', flags: 64 });
   }
 
   const ticketChannel = await createTicket(interaction);
 
   if (ticketChannel) {
     return interaction.editReply({ content: `Your ticket has been created: ${ticketChannel.toString()}.` });
-  } else {
-    return interaction.editReply({ content: 'Failed to create ticket. Check bot permissions.', ephemeral: true });
+    } else {
+    return interaction.editReply({ content: 'Failed to create ticket. Check bot permissions.', flags: 64 });
   }
 }

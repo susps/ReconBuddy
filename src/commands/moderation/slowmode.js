@@ -30,6 +30,6 @@ export async function execute(interaction) {
     await interaction.reply({ embeds: [embed] });
   } catch (err) {
     console.error(err);
-    await interaction.reply({ content: 'Failed to set slowmode (missing permissions).', ephemeral: true });
+    await interaction.reply({ content: 'Failed to set slowmode (missing permissions).', flags: 64 });
   }
 }

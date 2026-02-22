@@ -18,7 +18,7 @@ export async function execute(interaction) {
   const amount = interaction.options.getInteger('amount', true);
 
   if (amount < 2 || amount > 100) {
-    return interaction.reply({ content: 'Amount must be between 2 and 100.', ephemeral: true });
+    return interaction.reply({ content: 'Amount must be between 2 and 100.', flags: 64 });
   }
 
   try {
@@ -30,9 +30,9 @@ export async function execute(interaction) {
       .setDescription(`Deleted **${messages.size}** messages.`)
       .setTimestamp();
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: 64 });
   } catch (err) {
     console.error(err);
-    await interaction.reply({ content: 'Failed to delete messages (older than 14 days or missing perms).', ephemeral: true });
+    await interaction.reply({ content: 'Failed to delete messages (older than 14 days or missing perms).', flags: 64 });
   }
 }

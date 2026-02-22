@@ -70,7 +70,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   const userId = interaction.user.id;
   const userDir = await getUserNotesDir(userId);
@@ -84,10 +84,10 @@ export async function execute(interaction) {
     const content = interaction.options.getString('content', true).trim();
 
     if (name.length > 50) {
-      return interaction.editReply({ content: 'Note name too long (max 50 characters).', ephemeral: true });
+      return interaction.editReply({ content: 'Note name too long (max 50 characters).', flags: 64 });
     }
     if (content.length > 2000) {
-      return interaction.editReply({ content: 'Note content too long (max 2000 characters).', ephemeral: true });
+      return interaction.editReply({ content: 'Note content too long (max 2000 characters).', flags: 64 });
     }
 
     // Sanitize name (safe filename)
@@ -98,7 +98,7 @@ export async function execute(interaction) {
 
     return interaction.editReply({
       content: `Note **${name}** saved in category **${category}**.`,
-      ephemeral: true,
+      flags: 64,
     });
   }
 
@@ -116,7 +116,7 @@ export async function execute(interaction) {
       if (!content) {
         return interaction.editReply({
           content: `Note **${name}** not found in category **${category}**.`,
-          ephemeral: true,
+          flags: 64,
         });
       }
 
@@ -126,14 +126,14 @@ export async function execute(interaction) {
         .setDescription(content.length > 3900 ? content.slice(0, 3900) + '...' : content)
         .setFooter({ text: `Category: ${category} • ${notes.length} notes total` });
 
-      return interaction.editReply({ embeds: [embed], ephemeral: true });
+      return interaction.editReply({ embeds: [embed], flags: 64 });
     }
 
     // List all notes in category
     if (notes.length === 0) {
       return interaction.editReply({
         content: `No notes found in category **${category}** yet.`,
-        ephemeral: true,
+        flags: 64,
       });
     }
 
@@ -143,7 +143,7 @@ export async function execute(interaction) {
       .setDescription(notes.map(n => `• **${n}**`).join('\n'))
       .setFooter({ text: `Total notes in ${category}: ${notes.length}` });
 
-    return interaction.editReply({ embeds: [embed], ephemeral: true });
+    return interaction.editReply({ embeds: [embed], flags: 64 });
   }
 
   // REMOVE
@@ -157,7 +157,7 @@ export async function execute(interaction) {
     if (!notes.includes(name)) {
       return interaction.editReply({
         content: `Note **${name}** not found in category **${category}**.`,
-        ephemeral: true,
+        flags: 64,
       });
     }
 
@@ -165,7 +165,7 @@ export async function execute(interaction) {
 
     return interaction.editReply({
       content: `Note **${name}** deleted from category **${category}**.`,
-      ephemeral: true,
+      flags: 64,
     });
   }
 }

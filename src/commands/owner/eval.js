@@ -20,11 +20,11 @@ export async function execute(interaction) {
   if (!ownerIds.includes(interaction.user.id)) {
     return interaction.reply({
       content: 'This command is restricted to bot owners only.',
-      ephemeral: true,
+      flags: 64,
     });
   }
   
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   const code = interaction.options.getString('code', true);
 
