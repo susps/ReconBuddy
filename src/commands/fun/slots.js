@@ -12,7 +12,7 @@ const SYMBOLS = [
   { emoji: '💎', name: 'Diamond', payout: 20 }, // jackpot
 ];
 
-const COOLDOWN_MS = 30 * 1000; // 30 seconds
+const COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
 
 export const data = new SlashCommandBuilder()
   .setName('slots')

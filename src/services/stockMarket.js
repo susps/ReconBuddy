@@ -7,6 +7,9 @@ import { createCanvas } from 'canvas';
 import { getUser, addCoins, removeCoins } from './economy.js';
 import logger from '../utils/logger.js';
 
+// Stock cap: maximum total shares in circulation per stock listing
+const STOCK_CAP = 50000;
+
 // Initialize default stocks on startup
 export async function initStocks() {
   try {
@@ -151,6 +154,25 @@ export async function getMarket() {
   return await Stock.find({}).sort({ price: -1 });
 }
 
+// Calculate total shares in circulation for a specific stock
+async function getTotalSharesForTicker(ticker) {
+  const portfolios = await Portfolio.find({});
+  let total = 0;
+  for (const portfolio of portfolios) {
+    const stock = portfolio.stocks.find(s => s.ticker === ticker);
+    if (stock) {
+      total += stock.quantity;
+    }
+  }
+  return total;
+}
+
+// Get remaining shares available for a stock
+export async function getRemainingSharesForTicker(ticker) {
+  const total = await getTotalSharesForTicker(ticker);
+  return STOCK_CAP - total;
+}
+
 // Buy stock
 export async function buyStock(userId, username, ticker, quantity) {
   const stock = await getStock(ticker);
@@ -160,6 +182,13 @@ export async function buyStock(userId, username, ticker, quantity) {
 
   const user = await getUser(userId, username);
   if (user.balance < cost) throw new Error('Insufficient balance');
+
+  // Check per-stock cap
+  const currentTotal = await getTotalSharesForTicker(ticker);
+  if (currentTotal + quantity > STOCK_CAP) {
+    const remaining = STOCK_CAP - currentTotal;
+    throw new Error(`Stock cap reached for ${ticker}. Maximum buy: ${remaining} shares. Current total: ${currentTotal}/${STOCK_CAP}`);
+  }
 
   await removeCoins(userId, cost, username);
 

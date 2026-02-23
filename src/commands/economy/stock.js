@@ -5,7 +5,8 @@ import {
   buyStock, 
   sellStock, 
   getPortfolio, 
-  getMarket 
+  getMarket,
+  getRemainingSharesForTicker
 } from '../../services/stockMarket.js';
 import { getUser } from '../../services/economy.js';
 
@@ -79,17 +80,19 @@ export async function execute(interaction) {
       .setDescription('Current prices and stats')
       .setTimestamp();
 
-    stocks.forEach(stock => {
+    for (const stock of stocks) {
       const change24h = stock.history.length > 1
         ? ((stock.price - stock.history[stock.history.length - 2].price) / stock.history[stock.history.length - 2].price * 100).toFixed(2)
         : 0;
 
+      const remaining = await getRemainingSharesForTicker(stock.ticker);
+
       embed.addFields({
         name: `${stock.ticker} - ${stock.name}`,
-        value: `Price: **$${stock.price.toLocaleString()}**\n24h Change: ${change24h > 0 ? '+' : ''}${change24h}%\nVolatility: ${(stock.volatility * 100).toFixed(1)}%`,
+        value: `Price: **$${stock.price.toLocaleString()}**\n24h Change: ${change24h > 0 ? '+' : ''}${change24h}%\nVolatility: ${(stock.volatility * 100).toFixed(1)}%\nRemaining: **${remaining.toLocaleString()} / 50,000** shares`,
         inline: true,
       });
-    });
+    }
 
     return interaction.editReply({ embeds: [embed] });
   }
