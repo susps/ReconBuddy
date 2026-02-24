@@ -1,6 +1,6 @@
 // src/commands/fun/slots.js
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
-import { getUser, removeCoins, addCoins } from '../../services/economy.js';
+import { getUser, removeCoins, addCoins, addToHouse } from '../../services/economy.js';
 
 // Slot symbols and their payout multipliers (relative to bet)
 const SYMBOLS = [
@@ -54,8 +54,9 @@ export async function execute(interaction) {
     });
   }
 
-  // Deduct bet first
+  // Deduct bet first and collect to house
   await removeCoins(interaction.user.id, bet);
+  await addToHouse(bet);
 
   // Spin the reels!
   const reel1 = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
@@ -87,6 +88,9 @@ export async function execute(interaction) {
   user.lastSlots = now;
   await user.save();
 
+  // Refresh user for accurate balance display
+  const updatedUser = await getUser(interaction.user.id, interaction.user.username);
+
   // Build result embed
   const embed = new EmbedBuilder()
     .setColor(payout > 0 ? 0x57f287 : 0xed4245)
@@ -100,7 +104,7 @@ export async function execute(interaction) {
     .addFields(
       { name: 'Bet', value: `${bet.toLocaleString()}`, inline: true },
       { name: 'Payout', value: payout > 0 ? `+${payout.toLocaleString()}` : '0', inline: true },
-      { name: 'New Balance', value: user.balance.toLocaleString(), inline: true }
+      { name: 'New Balance', value: updatedUser.balance.toLocaleString(), inline: true }
     )
     .setFooter({ text: `Spun by ${interaction.user.tag}` })
     .setTimestamp();

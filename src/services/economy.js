@@ -41,6 +41,23 @@ export async function removeCoins(userId, amount, username) {
   return user.balance;
 }
 
+// House account ID for collecting bets
+const HOUSE_USER_ID = 'BOT_HOUSE_ACCOUNT';
+
+// Add amount to the house (bot) account
+export async function addToHouse(amount) {
+  if (amount <= 0) return null;
+  const house = await getUser(HOUSE_USER_ID, 'House');
+  house.balance += amount;
+  await house.save();
+  return house.balance;
+}
+
+export async function getHouseBalance() {
+  const house = await getUser(HOUSE_USER_ID, 'House');
+  return house.balance;
+}
+
 // Transfer coins
 export async function transferCoins(fromId, toId, amount, fromUsername, toUsername) {
   if (amount <= 0) throw new Error('Amount must be positive');
