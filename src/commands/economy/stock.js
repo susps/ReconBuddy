@@ -254,4 +254,36 @@ export async function execute(interaction) {
 
     return interaction.editReply({ embeds: [embed] });
   }
+
+  if (sub === 'history') {
+    const stock = await getStock(ticker);
+    if (!stock) {
+      return interaction.editReply({ content: 'Stock not found. Use /stock market to see available stocks.' });
+    }
+
+    if (!stock.history || stock.history.length === 0) {
+      return interaction.editReply({ content: 'No price history available for this stock yet.' });
+    }
+
+    const history = stock.history.slice(-20); // last 20 entries
+
+    let historyText = '';
+    history.reverse().forEach((entry, index) => {
+      const time = entry.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const price = entry.price;
+      historyText += `${index + 1}. ${time} - $${price.toLocaleString()}\n`;
+    });
+
+    const embed = new EmbedBuilder()
+      .setColor(0x5865f2)
+      .setTitle(`${ticker} - ${stock.name} Price History`)
+      .setDescription('Last 20 price updates')
+      .addFields({
+        name: 'History',
+        value: historyText || 'No history available',
+      })
+      .setTimestamp();
+
+    return interaction.editReply({ embeds: [embed] });
+  }
 }
