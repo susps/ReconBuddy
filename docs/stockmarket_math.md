@@ -38,9 +38,28 @@ Prices are updated hourly using `updateAllPrices`, which applies several steps t
 
 Trade Volume / Order Flow Impact
 ---------------------------------
-Trade activity (user buys and sells) can exert direct upward or downward pressure on a price. A robust approach is to compute a recent net trade volume for each ticker over a short window (for example, the last 24 ticks / 24 hours) and convert that net volume into a small percentage adjustment to price.
+Trade activity (user buys and sells) exerts direct upward or downward pressure on a price. This is split into two layers: an **immediate per-trade impact** and an **hourly aggregate impact**.
 
-Suggested variables and formulas:
+### Immediate Per-Trade Impact
+Each buy or sell nudges the stock price the moment the trade executes. This makes the market feel responsive and rewards early movers.
+
+- $S_{circ}$ = current shares in circulation for this ticker
+- $liquidityScale = \frac{1}{1 + \log_{10}(\max(1, price))}$
+- $rawImpact = \frac{quantity}{\max(1, S_{circ})} \times k_{immediate} \times liquidityScale$
+- $cappedImpact = \min(rawImpact,\ MAX\_IMMEDIATE\_IMPACT)$
+- $direction = +1$ for buys, $-1$ for sells
+- $newPrice = price \times (1 + direction \times cappedImpact)$
+
+Constants (current values):
+- `K_IMMEDIATE` = 0.15
+- `MAX_IMMEDIATE_IMPACT` = 0.01 (±1% cap per individual trade)
+
+This ensures single large trades cannot move the price more than 1%, while small trades relative to circulation have a proportionally smaller effect. High-priced stocks are further dampened by the liquidity scale.
+
+### Hourly Aggregate Impact
+In addition to immediate impacts, all trade volumes accumulated between hourly ticks are aggregated and applied as a second layer of pressure during `updateAllPrices`.
+
+Variables and formulas:
 
 - V_net = sum(buys - sells) over the recent window (shares)
 - S_circ = current shares in circulation for the ticker (sum of all user holdings) or STOCK_CAP as a normaliser
@@ -71,6 +90,11 @@ volumeImpactPct = \operatorname{clamp}(rawVolumeImpact \cdot liquidityScale, -MA
 $$
 
 Then add `volumeImpactPct` to the aggregated `totalImpactPct` before the final `MAX_PCT_CHANGE` cap is applied. This keeps order-flow effects commensurate with other market signals and the existing safety limits.
+
+Constants (current values):
+- `K_VOLUME` = 0.5
+- `MAX_VOLUME_IMPACT` = 0.03 (±3% cap per hourly tick)
+- `MIN_PRICE` = 5 (absolute price floor)
 
 Recording trade volumes
 ----------------------

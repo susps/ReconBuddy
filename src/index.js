@@ -227,9 +227,240 @@ process.on('uncaughtException', err => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Launch
+// Dashboard server integration
 // ─────────────────────────────────────────────────────────────────────────────
 
+import express from 'express';
+import os from 'node:os';
+import crypto from 'node:crypto';
+
+const dashboardApp = express();
+const DASHBOARD_PORT = process.env.DASHBOARD_PORT || 3001;
+const dashboardDir = path.join(__dirname, '../dashboard/public');
+
+// Trust proxy (nginx)
+dashboardApp.set('trust proxy', 1);
+
+const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID?.trim();
+const DISCORD_CLIENT_SECRET = (process.env.DISCORD_CLIENT_SECRET || process.env.DISCORD_SECRET)?.trim();
+const DASHBOARD_URL = process.env.DASHBOARD_URL?.trim() || `http://localhost:${DASHBOARD_PORT}`;
+const DISCORD_REDIRECT_URI = `${DASHBOARD_URL}/auth/callback`;
+const COOKIE_SECRET = process.env.COOKIE_SECRET?.trim() || crypto.randomBytes(32).toString('hex');
+
+// Simple in-memory session store (keyed by session token)
+const sessions = new Map();
+
+// Cookie helpers
+function setSessionCookie(res, token) {
+  res.cookie('session', token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 86400000,
+    path: '/',
+  });
+}
+
+function getSessionToken(req) {
+  const cookies = req.headers.cookie || '';
+  const match = cookies.match(/(?:^|;\s*)session=([^;]+)/);
+  return match ? match[1] : null;
+}
+
+function getSession(req) {
+  const token = getSessionToken(req);
+  return token ? sessions.get(token) : null;
+}
+
+// Discord OAuth2 login redirect
+dashboardApp.get('/auth/login', (req, res) => {
+  if (!DISCORD_CLIENT_ID) return res.status(500).send('DISCORD_CLIENT_ID not configured');
+  const params = new URLSearchParams({
+    client_id: DISCORD_CLIENT_ID,
+    redirect_uri: DISCORD_REDIRECT_URI,
+    response_type: 'code',
+    scope: 'identify guilds',
+  });
+  res.redirect(`https://discord.com/api/oauth2/authorize?${params}`);
+});
+
+// Discord OAuth2 callback
+dashboardApp.get('/auth/callback', async (req, res) => {
+  const code = req.query.code;
+  if (!code) return res.redirect('/');
+
+  try {
+    // Exchange code for token
+    const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: DISCORD_CLIENT_ID,
+        client_secret: DISCORD_CLIENT_SECRET,
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: DISCORD_REDIRECT_URI,
+      }),
+    });
+    const tokenData = await tokenRes.json();
+    if (!tokenData.access_token) {
+      log.error('OAuth2 token exchange failed:', JSON.stringify(tokenData));
+      return res.redirect('/');
+    }
+
+    // Fetch user info
+    const userRes = await fetch('https://discord.com/api/users/@me', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const user = await userRes.json();
+
+    // Fetch user guilds
+    const guildsRes = await fetch('https://discord.com/api/users/@me/guilds', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const guilds = await guildsRes.json();
+
+    // Create session
+    const sessionToken = crypto.randomBytes(32).toString('hex');
+    sessions.set(sessionToken, {
+      user,
+      guilds: Array.isArray(guilds) ? guilds : [],
+      accessToken: tokenData.access_token,
+      createdAt: Date.now(),
+    });
+
+    setSessionCookie(res, sessionToken);
+    res.redirect('/');
+  } catch (err) {
+    log.error('OAuth2 callback error:', err.message);
+    res.redirect('/');
+  }
+});
+
+// Logout
+dashboardApp.get('/auth/logout', (req, res) => {
+  const token = getSessionToken(req);
+  if (token) sessions.delete(token);
+  res.cookie('session', '', { httpOnly: true, maxAge: 0, path: '/' });
+  res.redirect('/');
+});
+
+// Get current user info
+dashboardApp.get('/api/me', async (req, res) => {
+  const session = getSession(req);
+  if (!session) return res.json({ loggedIn: false });
+
+  const { user, guilds } = session;
+  const avatarUrl = user.avatar
+    ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128`
+    : `https://cdn.discordapp.com/embed/avatars/${(BigInt(user.id) >> 22n) % 6n}.png`;
+
+  // Find mutual guilds (guilds both user and bot are in)
+  const botGuildIds = new Set(client.guilds.cache.map(g => g.id));
+  const mutualGuilds = guilds.filter(g => botGuildIds.has(g.id));
+
+  // Fetch user database info
+  let dbUser = null;
+  let portfolio = null;
+  let warnings = [];
+
+  try {
+    const UserModel = (await import('./models/User.js')).default;
+    const PortfolioModel = (await import('./models/Portfolio.js')).default;
+    const StockModel = (await import('./models/Stock.js')).default;
+
+    dbUser = await UserModel.findOne({ userId: user.id }).lean();
+    portfolio = await PortfolioModel.findOne({ userId: user.id }).lean();
+
+    // Calculate portfolio value
+    if (portfolio?.stocks?.length) {
+      const tickers = portfolio.stocks.map(s => s.ticker);
+      const stocks = await StockModel.find({ ticker: { $in: tickers } }).lean();
+      const priceMap = Object.fromEntries(stocks.map(s => [s.ticker, s.price]));
+      portfolio.stocks = portfolio.stocks.map(s => ({
+        ...s,
+        currentPrice: priceMap[s.ticker] || 0,
+        value: (priceMap[s.ticker] || 0) * s.quantity,
+      }));
+      portfolio.totalValue = portfolio.stocks.reduce((sum, s) => sum + s.value, 0);
+    }
+
+    // Read warnings from warnings.json
+    try {
+      const warningsPath = path.join(__dirname, '..', 'warnings.json');
+      const warningsData = JSON.parse(await fs.readFile(warningsPath, 'utf-8'));
+      warnings = warningsData[user.id] || [];
+    } catch { /* no warnings file */ }
+  } catch (err) {
+    log.error('Failed to fetch user DB data:', err.message);
+  }
+
+  res.json({
+    loggedIn: true,
+    user: {
+      id: user.id,
+      username: user.username,
+      globalName: user.global_name || user.username,
+      discriminator: user.discriminator,
+      avatar: avatarUrl,
+    },
+    economy: dbUser ? {
+      balance: dbUser.balance,
+      dailyStreak: dbUser.dailyStreak,
+      inventory: dbUser.inventory?.length || 0,
+    } : null,
+    portfolio: portfolio ? {
+      stocks: portfolio.stocks || [],
+      totalValue: portfolio.totalValue || 0,
+    } : null,
+    warnings,
+    mutualGuilds: mutualGuilds.length,
+    totalGuilds: guilds.length,
+  });
+});
+
+dashboardApp.get('/api/stats', (req, res) => {
+  const uptime = process.uptime();
+  const mem = process.memoryUsage();
+  const cpus = os.cpus();
+
+  const guilds = client.guilds.cache;
+  const firstGuild = guilds.first();
+
+  res.json({
+    bot: {
+      uptime: Math.floor(uptime),
+      memoryUsage: {
+        heapUsed: mem.heapUsed,
+        heapTotal: mem.heapTotal,
+        rss: mem.rss
+      },
+      guildCount: guilds.size,
+      userCount: guilds.reduce((total, g) => total + g.memberCount, 0),
+      commandsLoaded: client.commands.size,
+      discordJsVersion: discord.version,
+      nodeVersion: process.version,
+      os: `${os.type()} ${os.release()}`,
+      cpu: `${cpus.length} cores (${cpus[0]?.model || 'Unknown'})`
+    },
+    server: firstGuild ? {
+      name: firstGuild.name,
+      memberCount: firstGuild.memberCount,
+      channelCount: firstGuild.channels.cache.size
+    } : {
+      name: 'N/A',
+      memberCount: 0,
+      channelCount: 0
+    }
+  });
+});
+
+dashboardApp.use(express.static(dashboardDir));
+
+dashboardApp.listen(DASHBOARD_PORT, '0.0.0.0', () => {
+  log.info(`Dashboard running on http://0.0.0.0:${DASHBOARD_PORT}`);
+});
+
+// Launch bot
 bootstrap().catch(err => {
   log.err(err, 'Bootstrap failed');
   process.exit(1);

@@ -55,7 +55,59 @@ export async function initStocks() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Price update algorithm (hourly) – minimal NEXI influence
+// Trade impact constants
+// ─────────────────────────────────────────────────────────────────────────────
+
+const K_IMMEDIATE  = 0.15;   // per-trade sensitivity
+const MAX_IMMEDIATE_IMPACT = 0.01; // ±1% cap per individual trade
+const K_VOLUME     = 0.5;    // hourly aggregate sensitivity
+const MAX_VOLUME_IMPACT = 0.03; // ±3% cap per hourly tick
+const MIN_PRICE    = 5;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Record a trade for hourly aggregate calculation
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function recordTrade(stock, quantity, side) {
+  stock.metadata = stock.metadata || { pendingBuys: 0, pendingSells: 0 };
+  if (side === 'buy')  stock.metadata.pendingBuys  = (stock.metadata.pendingBuys  || 0) + quantity;
+  else                 stock.metadata.pendingSells = (stock.metadata.pendingSells || 0) + quantity;
+  stock.markModified('metadata');
+  await stock.save();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Apply immediate per-trade price impact
+// Buys push price up, sells push price down — scaled by circulating supply
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function applyImmediateTradeImpact(stock, quantity, side) {
+  const circulatingSupply = await getCirculatingSupply(stock.ticker);
+  const liquidityScale = 1 / (1 + Math.log10(Math.max(1, stock.price)));
+  const rawImpact = (quantity / Math.max(1, circulatingSupply)) * K_IMMEDIATE * liquidityScale;
+  const cappedImpact = Math.min(rawImpact, MAX_IMMEDIATE_IMPACT);
+  const direction = side === 'buy' ? 1 : -1;
+
+  stock.price = Math.max(MIN_PRICE, Math.round(stock.price * (1 + direction * cappedImpact) * 100) / 100);
+  stock.lastUpdated = new Date();
+  await stock.save();
+
+  logger.info(`[STOCK] Immediate ${side} impact on ${stock.ticker}: ${(direction * cappedImpact * 100).toFixed(4)}% (${quantity} shares)`);
+}
+
+// Helper – total shares currently held by all users for a ticker
+async function getCirculatingSupply(ticker) {
+  const portfolios = await Portfolio.find({ 'stocks.ticker': ticker });
+  let total = 0;
+  for (const p of portfolios) {
+    const h = p.stocks.find(s => s.ticker === ticker);
+    if (h) total += h.quantity;
+  }
+  return total;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Price update algorithm (hourly) – includes trade-volume impact
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function updateAllPrices(client) {
@@ -82,12 +134,33 @@ export async function updateAllPrices(client) {
       // 4. NEXI Coin – VERY MINIMAL server influence (as requested)
       if (stock.ticker === 'NEXI') {
         const totalMembers = client.guilds.cache.reduce((sum, g) => sum + g.memberCount, 0);
-        const memberImpact = (totalMembers / 10000) * 0.008; // tiny effect
+        const memberImpact = (totalMembers / 10000) * 0.008;
         newPrice *= (1 + memberImpact);
       }
 
+      // 5. Trade-volume impact (mass-buy / mass-sell pressure)
+      const meta = stock.metadata || { pendingBuys: 0, pendingSells: 0 };
+      const pendingBuys  = meta.pendingBuys  || 0;
+      const pendingSells = meta.pendingSells || 0;
+      const vNet = pendingBuys - pendingSells;
+
+      if (vNet !== 0) {
+        const circulatingSupply = await getCirculatingSupply(stock.ticker);
+        const volumeRatio = vNet / Math.max(1, circulatingSupply);
+        const rawVolumeImpact = K_VOLUME * volumeRatio;
+        const liquidityScale = 1 / (1 + Math.log10(Math.max(1, newPrice)));
+        const volumeImpactPct = Math.max(-MAX_VOLUME_IMPACT, Math.min(MAX_VOLUME_IMPACT, rawVolumeImpact * liquidityScale));
+
+        newPrice *= (1 + volumeImpactPct);
+        logger.info(`[STOCK] ${stock.ticker} trade-volume impact: net=${vNet}, impact=${(volumeImpactPct * 100).toFixed(4)}%`);
+      }
+
+      // Reset pending counters for next tick
+      stock.metadata = { ...(stock.metadata || {}), pendingBuys: 0, pendingSells: 0 };
+      stock.markModified('metadata');
+
       // Safety bounds
-      newPrice = Math.max(5, Math.round(newPrice * 100) / 100);
+      newPrice = Math.max(MIN_PRICE, Math.round(newPrice * 100) / 100);
 
       // Add to history (keep last 24)
       stock.history.push({ timestamp: new Date(), price: newPrice });
@@ -143,6 +216,10 @@ export async function buyStock(userId, username, ticker, quantity) {
 
   await removeCoins(userId, cost);
 
+  // Record trade volume & apply immediate price bump
+  await recordTrade(stock, quantity, 'buy');
+  await applyImmediateTradeImpact(stock, quantity, 'buy');
+
   let portfolio = await Portfolio.findOne({ userId });
   if (!portfolio) portfolio = new Portfolio({ userId, stocks: [] });
 
@@ -171,6 +248,10 @@ export async function sellStock(userId, ticker, quantity) {
   if (!holding || holding.quantity < quantity) throw new Error('Insufficient shares');
 
   const revenue = Math.round(stock.price * quantity);
+
+  // Record trade volume & apply immediate price dip
+  await recordTrade(stock, quantity, 'sell');
+  await applyImmediateTradeImpact(stock, quantity, 'sell');
 
   holding.quantity -= quantity;
   if (holding.quantity <= 0) {

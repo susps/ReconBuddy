@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReconBuddy • Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+        
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .logo-font { font-family: 'Space Grotesk', sans-serif; }
+        .stat-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .stat-card:hover { transform: translateY(-8px); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1); }
+        .live-dot { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    </style>
+</head>
+<body class="bg-zinc-950 text-zinc-200 min-h-screen">
+    <!-- Navbar -->
+    <nav class="bg-zinc-900 border-b border-zinc-800">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-x-3">
+                <div class="w-9 h-9 bg-violet-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl logo-font">R</div>
+                <div>
+                    <h1 class="logo-font text-2xl font-semibold tracking-tighter text-white">ReconBuddy</h1>
+                    <p class="text-[10px] text-zinc-500 -mt-1">discord bot</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-x-6">
+                <div class="flex items-center gap-x-2 bg-zinc-800 px-4 py-1.5 rounded-3xl text-sm">
+                    <div class="w-2 h-2 bg-emerald-500 rounded-full live-dot"></div>
+                    <span class="text-emerald-400 font-medium">Online</span>
+                </div>
+                <div id="navUser">
+                    <a href="/auth/login"
+                       class="flex items-center gap-x-2 bg-indigo-600 hover:bg-indigo-500 px-5 py-2 rounded-2xl transition-colors text-sm font-medium text-white">
+                        <i class="fab fa-discord"></i>
+                        <span>Login</span>
+                    </a>
+                </div>
+                <button onclick="refreshStats()" 
+                        class="flex items-center gap-x-2 bg-zinc-800 hover:bg-zinc-700 px-5 py-2 rounded-2xl transition-colors text-sm font-medium">
+                    <i class="fas fa-sync-alt"></i>
+                    <span>Refresh</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-6 py-8">
+        <div class="flex justify-between items-end mb-8">
+            <div>
+                <h2 class="text-4xl font-semibold tracking-tight">Dashboard</h2>
+                <p class="text-zinc-400 mt-1">Real-time overview of your bot and servers</p>
+            </div>
+            <div id="lastUpdated" class="text-xs text-zinc-500 font-mono"></div>
+        </div>
+
+        <!-- Key Metrics -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10" id="keyMetrics"></div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- Bot Information -->
+            <div class="lg:col-span-7 bg-zinc-900 rounded-3xl p-8 border border-zinc-800">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-semibold flex items-center gap-x-2">
+                        <i class="fas fa-robot text-violet-400"></i>
+                        Bot Statistics
+                    </h3>
+                    <span id="guildCount" class="text-sm bg-zinc-800 px-4 py-1 rounded-2xl"></span>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-6">
+                        <div>
+                            <div class="text-zinc-400 text-sm mb-1">UPTIME</div>
+                            <div id="uptimeLive" class="text-4xl font-mono font-semibold text-white tabular-nums">00h 00m 00s</div>
+                        </div>
+                        
+                        <div>
+                            <div class="flex justify-between text-sm mb-2">
+                                <span class="text-zinc-400">Memory Usage</span>
+                                <span id="memoryText" class="font-mono text-emerald-400">0 MB</span>
+                            </div>
+                            <div class="h-2 bg-zinc-800 rounded-3xl overflow-hidden">
+                                <div id="memoryBar" class="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 w-0 transition-all duration-700"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="botRaw" class="bg-black/50 rounded-2xl p-5 text-xs font-mono text-zinc-400 overflow-auto max-h-64">
+                        Loading detailed stats...
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Profile -->
+            <div class="lg:col-span-5 bg-zinc-900 rounded-3xl p-8 border border-zinc-800">
+                <h3 class="text-xl font-semibold mb-6 flex items-center gap-x-2">
+                    <i class="fas fa-user text-sky-400"></i>
+                    Your Profile
+                </h3>
+                
+                <div id="userPanel">
+                    <div class="flex flex-col items-center justify-center py-8 text-center">
+                        <i class="fab fa-discord text-5xl text-indigo-400 mb-4"></i>
+                        <p class="text-zinc-400 mb-4">Log in with Discord to see your profile</p>
+                        <a href="/auth/login"
+                           class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-2xl font-medium transition-colors">
+                            <i class="fab fa-discord mr-2"></i>Login with Discord
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-12 text-center text-zinc-500 text-xs flex flex-col items-center gap-y-4">
+            <a href="https://discord.gg/thenexus" target="_blank" rel="noopener noreferrer"
+               class="inline-flex items-center gap-x-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-2xl text-sm font-medium transition-colors">
+                <i class="fab fa-discord"></i>
+                Join The Community Server
+            </a>
+            <div>Powered by discord.js + Nexi Development</div>
+        </div>
+    </div>
+
+    <script>
+        let statsData = {};
+        let uptimeInterval = null;
+
+        function formatUptime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            return `${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`;
+        }
+
+        function formatBytes(bytes) {
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function updateKeyMetrics(data) {
+            const container = document.getElementById('keyMetrics');
+            container.innerHTML = `
+                <div class="stat-card bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+                    <div class="flex justify-between">
+                        <div>
+                            <p class="text-xs uppercase tracking-widest text-zinc-500">Uptime</p>
+                            <p id="metricUptime" class="text-3xl font-semibold mt-2 font-mono">${formatUptime(data.bot.uptime)}</p>
+                        </div>
+                        <i class="fas fa-clock text-4xl text-violet-500/30"></i>
+                    </div>
+                </div>
+                <div class="stat-card bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+                    <div class="flex justify-between">
+                        <div>
+                            <p class="text-xs uppercase tracking-widest text-zinc-500">Guilds</p>
+                            <p class="text-3xl font-semibold mt-2">${data.bot.guildCount}</p>
+                        </div>
+                        <i class="fas fa-globe text-4xl text-sky-500/30"></i>
+                    </div>
+                </div>
+                <div class="stat-card bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+                    <div class="flex justify-between">
+                        <div>
+                            <p class="text-xs uppercase tracking-widest text-zinc-500">Users</p>
+                            <p class="text-3xl font-semibold mt-2">${data.bot.userCount}</p>
+                        </div>
+                        <i class="fas fa-users text-4xl text-amber-500/30"></i>
+                    </div>
+                </div>
+                <div class="stat-card bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+                    <div class="flex justify-between">
+                        <div>
+                            <p class="text-xs uppercase tracking-widest text-zinc-500">Memory</p>
+                            <p class="text-3xl font-semibold mt-2 text-emerald-400" id="metricMemory">${formatBytes(data.bot.memoryUsage?.heapUsed || 0)}</p>
+                        </div>
+                        <i class="fas fa-microchip text-4xl text-emerald-500/30"></i>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function fetchStats() {
+            try {
+                const res = await fetch('/api/stats');
+                if (!res.ok) throw new Error('Failed');
+                statsData = await res.json();
+
+                updateKeyMetrics(statsData);
+
+                document.getElementById('uptimeLive').textContent = formatUptime(statsData.bot.uptime);
+                document.getElementById('guildCount').textContent = `${statsData.bot.guildCount} guild${statsData.bot.guildCount === 1 ? '' : 's'}`;
+
+                const mem = statsData.bot.memoryUsage || {};
+                const memoryUsed = mem.heapUsed || 0;
+                const memoryTotal = mem.heapTotal || memoryUsed * 2;
+                const percent = memoryTotal > 0 ? Math.min(Math.floor((memoryUsed / memoryTotal) * 100), 100) : 0;
+                document.getElementById('memoryBar').style.width = percent + '%';
+                document.getElementById('memoryText').textContent = `${formatBytes(memoryUsed)} / ${formatBytes(memoryTotal)}`;
+
+                document.getElementById('botRaw').innerHTML = `<strong class="text-violet-300">Bot:</strong><br>` + JSON.stringify(statsData.bot, null, 2);
+
+                document.getElementById('lastUpdated').textContent = `LAST UPDATED • ${new Date().toLocaleTimeString()}`;
+            } catch (err) {
+                console.error(err);
+                document.getElementById('keyMetrics').innerHTML = `<div class="col-span-4 text-red-400 text-center py-8">Failed to load stats — retrying...</div>`;
+            }
+        }
+
+        function startLiveUptime() {
+            if (uptimeInterval) clearInterval(uptimeInterval);
+            uptimeInterval = setInterval(() => {
+                if (statsData.bot && statsData.bot.uptime !== undefined) {
+                    const newUptime = statsData.bot.uptime + 1;
+                    document.getElementById('uptimeLive').textContent = formatUptime(newUptime);
+                    const uptimeEl = document.getElementById('metricUptime');
+                    if (uptimeEl) uptimeEl.textContent = formatUptime(newUptime);
+                }
+            }, 1000);
+        }
+
+        function refreshStats() { fetchStats(); }
+
+        async function fetchUser() {
+            try {
+                const res = await fetch('/api/me');
+                const data = await res.json();
+                const panel = document.getElementById('userPanel');
+                const navUser = document.getElementById('navUser');
+
+                if (data.loggedIn) {
+                    // Build portfolio rows
+                    let portfolioHtml = '<span class="text-zinc-500">No stocks</span>';
+                    if (data.portfolio?.stocks?.length) {
+                        portfolioHtml = data.portfolio.stocks.map(s => {
+                            const pnl = ((s.currentPrice - s.buyPrice) / s.buyPrice * 100).toFixed(1);
+                            const pnlColor = pnl >= 0 ? 'text-emerald-400' : 'text-red-400';
+                            const pnlSign = pnl >= 0 ? '+' : '';
+                            return `<div class="flex justify-between items-center py-1.5 border-b border-zinc-800 last:border-0">
+                                <div>
+                                    <span class="text-white font-medium">${s.ticker}</span>
+                                    <span class="text-zinc-500 text-xs ml-1">x${s.quantity}</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-zinc-300">$${s.value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                    <span class="${pnlColor} text-xs ml-2">${pnlSign}${pnl}%</span>
+                                </div>
+                            </div>`;
+                        }).join('');
+                    }
+
+                    // Build warnings
+                    let warningsHtml = '<span class="text-zinc-500">No warnings</span>';
+                    if (data.warnings?.length) {
+                        warningsHtml = data.warnings.map((w, i) => {
+                            const date = new Date(w.timestamp).toLocaleDateString();
+                            return `<div class="flex items-start gap-x-3 py-2 border-b border-zinc-800 last:border-0">
+                                <div class="w-6 h-6 bg-red-500/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    <span class="text-red-400 text-xs font-bold">${i + 1}</span>
+                                </div>
+                                <div>
+                                    <p class="text-zinc-300 text-sm">${w.reason}</p>
+                                    <p class="text-zinc-500 text-xs mt-0.5">By ${w.moderator?.tag || 'Unknown'} • ${date}</p>
+                                </div>
+                            </div>`;
+                        }).join('');
+                    }
+
+                    panel.innerHTML = `
+                        <div class="space-y-5">
+                            <div class="flex items-center gap-x-4">
+                                <img src="${data.user.avatar}" alt="avatar" class="w-14 h-14 rounded-full border-2 border-violet-500">
+                                <div>
+                                    <div class="text-xl font-semibold text-white">${data.user.globalName}</div>
+                                    <div class="text-sm text-zinc-400">@${data.user.username}</div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-3 gap-3">
+                                <div class="bg-zinc-950 rounded-2xl p-4 text-center">
+                                    <div class="text-2xl font-semibold text-emerald-400">$${data.economy ? data.economy.balance.toLocaleString() : '0'}</div>
+                                    <div class="text-xs text-zinc-400 mt-1">Balance</div>
+                                </div>
+                                <div class="bg-zinc-950 rounded-2xl p-4 text-center">
+                                    <div class="text-2xl font-semibold text-sky-400">${data.economy?.dailyStreak || 0}</div>
+                                    <div class="text-xs text-zinc-400 mt-1">Daily Streak</div>
+                                </div>
+                                <div class="bg-zinc-950 rounded-2xl p-4 text-center">
+                                    <div class="text-2xl font-semibold text-amber-400">${data.economy?.inventory || 0}</div>
+                                    <div class="text-xs text-zinc-400 mt-1">Items</div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-sm text-zinc-400 uppercase tracking-wider">Portfolio</span>
+                                    <span class="text-sm font-mono text-emerald-400">$${data.portfolio?.totalValue?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) || '0.00'}</span>
+                                </div>
+                                <div class="bg-black/40 rounded-2xl p-4 text-sm max-h-36 overflow-y-auto">
+                                    ${portfolioHtml}
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-sm text-zinc-400 uppercase tracking-wider">Warnings</span>
+                                    <span class="text-xs font-medium ${data.warnings?.length ? 'text-red-400' : 'text-emerald-400'}">${data.warnings?.length || 0} / 3</span>
+                                </div>
+                                <div class="bg-black/40 rounded-2xl p-4 text-sm max-h-36 overflow-y-auto">
+                                    ${warningsHtml}
+                                </div>
+                            </div>
+
+                            <a href="/auth/logout"
+                               class="block text-center bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-2xl text-sm font-medium transition-colors">
+                                <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                            </a>
+                        </div>
+                    `;
+                    navUser.innerHTML = `
+                        <div class="flex items-center gap-x-2 bg-zinc-800 px-3 py-1.5 rounded-3xl">
+                            <img src="${data.user.avatar}" alt="" class="w-6 h-6 rounded-full">
+                            <span class="text-sm font-medium">${data.user.globalName}</span>
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                console.error('Failed to fetch user:', err);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchStats();
+            fetchUser();
+            startLiveUptime();
+            setInterval(fetchStats, 7000);
+            console.log('%c✅ ReconBuddy Dashboard ready', 'color:#a78bfa; font-weight:700');
+        });
+    </script>
+</body>
+</html>

@@ -12,6 +12,10 @@ const stockSchema = new mongoose.Schema({
     price: { type: Number, required: true },
   }], // last 24 hours of prices
   factors: { type: Object, default: { memberGrowth: 0.1, messageActivity: 0.2 } }, // for NEXI
+  metadata: {
+    type: Object,
+    default: { pendingBuys: 0, pendingSells: 0 },
+  },
 });
 
 export default mongoose.models.Stock || mongoose.model('Stock', stockSchema);
