@@ -61,7 +61,7 @@ export async function initStocks() {
 const K_IMMEDIATE  = 0.15;   // per-trade sensitivity
 const MAX_IMMEDIATE_IMPACT = 0.01; // ±1% cap per individual trade
 const K_VOLUME     = 0.5;    // hourly aggregate sensitivity
-const MAX_VOLUME_IMPACT = 0.03; // ±3% cap per hourly tick
+const MAX_VOLUME_IMPACT = 3.0; // ±300% cap per hourly tick
 const MIN_PRICE    = 5;
 
 // ─────────────────────────────────────────────────────────────────────────────

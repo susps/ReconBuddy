@@ -2,53 +2,141 @@
 
 This document describes the underlying math and formulas used by the stock market service (`src/services/stockMarket.js`) in ReconBuddy. It covers how prices are calculated, how market signals are derived, and the logic governing buy/sell operations.
 
+## Initialization
+
+On import, `initStocks()` runs automatically and ensures the following default stocks exist in the database:
+
+| Ticker   | Name              | Starting Price | Volatility |
+|----------|-------------------|----------------|------------|
+| NEXI     | NEXI Coin         | 150            | 0.10       |
+| TECH     | Tech Giants Inc.  | 280            | 0.08       |
+| GME      | GameStop Corp.    | 45             | 0.18       |
+| CRYPTO   | Crypto Index      | 220            | 0.15       |
+| RETAIL   | Retail Leaders    | 75             | 0.09       |
+
+If a ticker already exists it is left untouched.
+
+## Constants
+
+| Constant              | Value       | Purpose                                         |
+|-----------------------|-------------|-------------------------------------------------|
+| `K_IMMEDIATE`         | 0.15        | Per-trade price-impact sensitivity               |
+| `MAX_IMMEDIATE_IMPACT`| 0.01 (±1%)  | Cap on a single trade's price movement           |
+| `K_VOLUME`            | 0.5         | Hourly aggregate trade-volume sensitivity        |
+| `MAX_VOLUME_IMPACT`   | 3.0 (±300%) | Cap on hourly trade-volume price movement        |
+| `MIN_PRICE`           | 5           | Absolute price floor                             |
+| Stock supply limit    | 5,000,000   | Maximum shares in circulation per ticker         |
+
 ## Price Update Overview
-Prices are updated hourly using `updateAllPrices`, which applies several steps to calculate a new price for each stock. The process combines randomness with game-specific market signals and protective caps.
 
-1. **Base Price and Constants**
-   - `stock.price` – current price from the database.
-   - `STOCK_CAP` – maximum total shares available for each ticker (50 000). Not used in price math but relevant for circulation.
-   - `MAX_PCT_CHANGE` – the largest percentage change permitted per tick (5%).
-   - `MIN_PRICE` – floor price, set to `1` to avoid zero or negative values.
+Prices are updated hourly via a cron job (`0 * * * *`) that calls `updateAllPrices(client)`. The algorithm applies five sequential steps to each stock's current price.
 
-2. **Random Fluctuation**
-   - A basic stochastic component is added via:
-     ```js
-     const baseFluctuationPct = (Math.random() - 0.5) * (stock.volatility || 0.1);
-     newPrice = Math.max(MIN_PRICE, newPrice * (1 + baseFluctuationPct));
-     ```
-   - This produces a uniformly distributed percentage change in `[-volatility/2, +volatility/2]`.
-   - `stock.volatility` is provided per stock (e.g. 0.12 for NEXI).
+### Step 1 — Random Fluctuation
 
-3. **Market Signals**
-   Global Discord metrics are used to nudge prices:
-   - `totalMembers`, `onlineMembers`, `totalGuilds`, and `textChannels` are aggregated once per tick.
-   - Previous values are stored in `stock.metadata` for delta calculations.
+```js
+const randomPct = (Math.random() - 0.5) * stock.volatility * 2;
+newPrice *= (1 + randomPct);
+```
 
-   **Derived percentages**:
-   ```js
-   const memberGrowthPct = (memberDelta / Math.max(1, prevMembers)) * memberGrowthFactor * 0.05;
-   const guildGrowthPct  = (guildDelta  / Math.max(1, prevGuilds))  * 0.03;
-   const engagementPct   = onlineRatio * 0.02;
-   const channelActivityPct = (textChannels / Math.max(1, totalGuilds)) * messageActivityFactor * 0.02;
-   ```
-   - `memberGrowthFactor` and `messageActivityFactor` come from `stock.factors` (defaults to 0.02 if unspecified).
-   - These formulas convert raw deltas/ratios into small impact percentages relative to the stock price.
-   - `memberDelta` / `guildDelta` compute absolute growth; dividing by previous totals yields a rate.
+This produces a uniformly distributed percentage change in the range $[-volatility,\ +volatility]$. Each stock has its own `volatility` value (see table above).
 
-Trade Volume / Order Flow Impact
----------------------------------
+### Step 2 — Light Upward Trend
+
+```js
+const trendPct = 0.0015;
+newPrice *= (1 + trendPct);
+```
+
+A constant +0.15% bias per tick prevents long-term price decay.
+
+### Step 3 — Gentle Mean Reversion
+
+```js
+const longTermMean = stock.ticker === 'NEXI' ? 160 : 200;
+const deviation = (longTermMean - newPrice) / longTermMean;
+newPrice += deviation * 0.8;
+```
+
+Each ticker has a fixed target price (`longTermMean`). The deviation from that target is computed as a fraction, then scaled by 0.8 and added directly to the price. This nudges the price back toward its anchor without hard-capping it.
+
+$$
+deviation = \frac{longTermMean - price}{longTermMean}
+$$
+
+$$
+newPrice = price + deviation \times 0.8
+$$
+
+### Step 4 — NEXI Server Influence (NEXI ticker only)
+
+```js
+const totalMembers = client.guilds.cache.reduce((sum, g) => sum + g.memberCount, 0);
+const memberImpact = (totalMembers / 10000) * 0.008;
+newPrice *= (1 + memberImpact);
+```
+
+Only the NEXI ticker receives a very small upward nudge proportional to the bot's total member count across all guilds. Other tickers are unaffected.
+
+### Step 5 — Hourly Trade-Volume Impact
+
+Between ticks, every `buyStock` / `sellStock` call increments `stock.metadata.pendingBuys` or `stock.metadata.pendingSells` via `recordTrade()`. During the hourly update these counters are consumed:
+
+$$
+V_{net} = pendingBuys - pendingSells
+$$
+
+$$
+volumeRatio = \frac{V_{net}}{\max(1,\ S_{circ})}
+$$
+
+$$
+rawVolumeImpact = K_{VOLUME} \cdot volumeRatio
+$$
+
+$$
+liquidityScale = \frac{1}{1 + \log_{10}(\max(1,\ newPrice))}
+$$
+
+$$
+volumeImpactPct = \operatorname{clamp}(rawVolumeImpact \cdot liquidityScale,\ -MAX\_VOLUME\_IMPACT,\ +MAX\_VOLUME\_IMPACT)
+$$
+
+$$
+newPrice = newPrice \times (1 + volumeImpactPct)
+$$
+
+Where $S_{circ}$ is the current circulating supply (total shares held by all users for this ticker). The pending counters are reset to zero after each tick.
+
+### Final Safety Bounds
+
+After all steps:
+
+```js
+newPrice = Math.max(MIN_PRICE, Math.round(newPrice * 100) / 100);
+```
+
+The price is floored at `MIN_PRICE` (5) and rounded to two decimal places. There is no global maximum-percentage-change cap — the individual step caps (volatility range, trend constant, mean-reversion scale, volume impact cap) provide stability.
+
+### History
+
+The last 24 price entries are kept in `stock.history`. After each tick the new price is pushed and the oldest entry is shifted out if the array exceeds 24 elements.
+
+---
+
+## Trade Volume / Order Flow Impact
+
 Trade activity (user buys and sells) exerts direct upward or downward pressure on a price. This is split into two layers: an **immediate per-trade impact** and an **hourly aggregate impact**.
 
 ### Immediate Per-Trade Impact
-Each buy or sell nudges the stock price the moment the trade executes. This makes the market feel responsive and rewards early movers.
 
-- $S_{circ}$ = current shares in circulation for this ticker
-- $liquidityScale = \frac{1}{1 + \log_{10}(\max(1, price))}$
-- $rawImpact = \frac{quantity}{\max(1, S_{circ})} \times k_{immediate} \times liquidityScale$
+Each buy or sell nudges the stock price the moment the trade executes via `applyImmediateTradeImpact()`. This makes the market feel responsive and rewards early movers.
+
+- $S_{circ}$ = current shares in circulation for this ticker (`getCirculatingSupply`)
+- $liquidityScale = \frac{1}{1 + \log_{10}(\max(1,\ price))}$
+- $rawImpact = \frac{quantity}{\max(1,\ S_{circ})} \times K_{IMMEDIATE} \times liquidityScale$
 - $cappedImpact = \min(rawImpact,\ MAX\_IMMEDIATE\_IMPACT)$
 - $direction = +1$ for buys, $-1$ for sells
-- $newPrice = price \times (1 + direction \times cappedImpact)$
+- $newPrice = \max(MIN\_PRICE,\ \operatorname{round2}(price \times (1 + direction \times cappedImpact)))$
 
 Constants (current values):
 - `K_IMMEDIATE` = 0.15
@@ -57,137 +145,108 @@ Constants (current values):
 This ensures single large trades cannot move the price more than 1%, while small trades relative to circulation have a proportionally smaller effect. High-priced stocks are further dampened by the liquidity scale.
 
 ### Hourly Aggregate Impact
-In addition to immediate impacts, all trade volumes accumulated between hourly ticks are aggregated and applied as a second layer of pressure during `updateAllPrices`.
 
-Variables and formulas:
-
-- V_net = sum(buys - sells) over the recent window (shares)
-- S_circ = current shares in circulation for the ticker (sum of all user holdings) or STOCK_CAP as a normaliser
-- volumeRatio = V_net / max(1, S_circ)
-- k_volume = sensitivity constant (example: 0.5)
-- rawVolumeImpact = volumeRatio * k_volume
-- liquidityScale = 1 / (1 + log10(max(1, stock.price)))  // same liquidity scaling used elsewhere
-- volumeImpactPct = clamp(rawVolumeImpact * liquidityScale, -MAX_VOLUME_IMPACT, +MAX_VOLUME_IMPACT)
-
-Where `MAX_VOLUME_IMPACT` is a safety cap on how much trade flow alone can move the price in one tick (example: 0.03 = 3%).
-
-Application (pseudo-formula):
-
-$$
-V_{net} = \sum_{t=0}^{w} (buys_t - sells_t)
-$$
-
-$$
-volumeRatio = \frac{V_{net}}{\max(1, S_{circ})}
-$$
-
-$$
-rawVolumeImpact = k_{volume} \cdot volumeRatio
-$$
-
-$$
-volumeImpactPct = \operatorname{clamp}(rawVolumeImpact \cdot liquidityScale, -MAX_{V}, MAX_{V})
-$$
-
-Then add `volumeImpactPct` to the aggregated `totalImpactPct` before the final `MAX_PCT_CHANGE` cap is applied. This keeps order-flow effects commensurate with other market signals and the existing safety limits.
+See **Step 5** above. All trade volumes accumulated between hourly ticks via `recordTrade()` are aggregated and applied as a second layer of pressure during `updateAllPrices`.
 
 Constants (current values):
 - `K_VOLUME` = 0.5
-- `MAX_VOLUME_IMPACT` = 0.03 (±3% cap per hourly tick)
+- `MAX_VOLUME_IMPACT` = 3.0 (±300% cap per hourly tick)
 - `MIN_PRICE` = 5 (absolute price floor)
 
-Recording trade volumes
-----------------------
-To support this calculation the market needs a compact record of recent trade volumes per ticker. Recommended options:
+### Recording Trade Volumes
 
-- Maintain `stock.metadata.volumeHistory` as a short ring buffer of `{timestamp, buys, sells, net}` entries (one entry per tick, since updates run hourly).
-- Maintain `stock.metadata.lastNetVolume` or `pendingBuys`/`pendingSells` as quick-access counters consumed by `updateAllPrices`.
-
-Implementation notes:
-
-- In `buyStock` / `sellStock`, increment a per-ticker counter or append to the current tick's `volumeHistory` entry. Example pseudocode to call from `buyStock` / `sellStock`:
+`recordTrade(stock, quantity, side)` increments `stock.metadata.pendingBuys` or `stock.metadata.pendingSells` and saves the document immediately. Both `buyStock` and `sellStock` call this before applying the immediate impact.
 
 ```js
-function recordTrade(stock, quantity, side) {
-  // side === 'buy' or 'sell'
-  stock.metadata = stock.metadata || {};
-  stock.metadata.pendingBuys = stock.metadata.pendingBuys || 0;
-  stock.metadata.pendingSells = stock.metadata.pendingSells || 0;
-  if (side === 'buy') stock.metadata.pendingBuys += quantity;
-  else stock.metadata.pendingSells += quantity;
+async function recordTrade(stock, quantity, side) {
+  stock.metadata = stock.metadata || { pendingBuys: 0, pendingSells: 0 };
+  if (side === 'buy')  stock.metadata.pendingBuys  = (stock.metadata.pendingBuys  || 0) + quantity;
+  else                 stock.metadata.pendingSells = (stock.metadata.pendingSells || 0) + quantity;
+  stock.markModified('metadata');
+  await stock.save();
 }
 ```
 
-Then in `updateAllPrices`, compute `V_net = pendingBuys - pendingSells` (or aggregate `volumeHistory`) and use it to compute `volumeImpactPct`, then clear the pending counters for the next tick.
+In `updateAllPrices`, $V_{net} = pendingBuys - pendingSells$ is computed, used for price impact, then both counters are reset to zero for the next tick.
 
-Parameter guidance
-------------------
-- `k_volume` (sensitivity): 0.3–0.7 is a reasonable starting range. Lower makes trade flow less impactful.
-- `MAX_VOLUME_IMPACT` (per-tick cap): 0.02–0.05 (2–5%) to maintain stability.
-- `S_circ` normaliser: prefer current circulating supply (sum of user holdings) so small-cap tickers are affected more by the same absolute volume.
-
-Integration point
------------------
-Add `volumeImpactPct` to `totalImpactPct` before mean reversion and liquidity scaling (or immediately after, depending on desired order of effects). The existing `MAX_PCT_CHANGE` cap will still apply, ensuring safety.
-
-4. **Mean Reversion**
-   - If the current price deviates from the recent average (last 3+ history entries), a corrective pressure is added:
-     ```js
-     const deviation = (stock.price - avg) / Math.max(1, avg);
-     totalImpactPct += -Math.sign(deviation) * Math.min(0.02, Math.abs(deviation) * 0.05);
-     ```
-   - The effect opposes the direction of deviation, capped at ±2% per tick.
-
-5. **Liquidity Scaling**
-   - Higher-priced assets move less to simulate lower liquidity:
-     ```js
-     const liquidityScale = 1 / (1 + Math.log10(Math.max(1, stock.price)));
-     totalImpactPct *= liquidityScale;
-     ```
-   - This shrinks the aggregate impact percentage when price grows.
-
-6. **Capping and Application**
-   - Aggregate impact is capped to `[-MAX_PCT_CHANGE, +MAX_PCT_CHANGE]`.
-   - The new price is computed as:
-     ```js
-     newPrice = Math.max(MIN_PRICE, Math.round(newPrice * (1 + cappedPct)));
-     ```
-   - History is updated, and `stock.metadata` is refreshed for the next tick.
+---
 
 ## Buy/Sell Calculations
-The stock transaction functions use simple arithmetic:
 
-- **Buying**:
-  - Cost = `stock.price * quantity`.
-  - Balance check ensures user has enough coins.
-  - Cap check prevents buying when total shares in circulation would exceed `STOCK_CAP`.
-  - Portfolio entry updates average buy price when acquiring additional shares.
+### Buying (`buyStock`)
 
-- **Selling**:
-  - Revenue = `stock.price * quantity`.
-  - Shares are deducted from the portfolio; if quantity drops to zero, the entry is removed.
-  - Coins are added back to the user via economy service.
+1. Look up the stock by ticker.
+2. Check remaining shares: `getRemainingSharesForTicker` ensures the purchase would not push circulation above the 5,000,000 share limit.
+3. Cost = `Math.round(stock.price * quantity)`.
+4. Balance check — user must have enough coins.
+5. Deduct coins via `removeCoins`.
+6. Record trade volume and apply immediate price bump.
+7. Update (or create) the user's portfolio:
+   - If the user already holds shares of this ticker, the average buy price is recalculated:
+     $$avgBuyPrice = \frac{(oldBuyPrice \times oldQty) + (currentPrice \times newQty)}{oldQty + newQty}$$
+   - Otherwise a new entry is pushed.
+
+### Selling (`sellStock`)
+
+1. Look up the stock by ticker.
+2. Verify the user's portfolio holds enough shares.
+3. Revenue = `Math.round(stock.price * quantity)`.
+4. Record trade volume and apply immediate price dip.
+5. Deduct shares; remove the entry entirely if quantity reaches zero.
+6. Credit coins via `addCoins`.
 
 ### Circulation Tracking
-To enforce caps, the code iterates all portfolios:
+
+Two helpers manage share supply:
+
+**`getCirculatingSupply(ticker)`** — returns total shares currently held across all portfolios for a ticker (used for price-impact calculations):
+
 ```js
-async function getTotalSharesForTicker(ticker) {
-  const portfolios = await Portfolio.find({});
+async function getCirculatingSupply(ticker) {
+  const portfolios = await Portfolio.find({ 'stocks.ticker': ticker });
   let total = 0;
-  for (const portfolio of portfolios) {
-    const stock = portfolio.stocks.find(s => s.ticker === ticker);
-    if (stock) total += stock.quantity;
+  for (const p of portfolios) {
+    const h = p.stocks.find(s => s.ticker === ticker);
+    if (h) total += h.quantity;
   }
   return total;
 }
 ```
-Remaining shares available = `STOCK_CAP - total`.
+
+**`getRemainingSharesForTicker(ticker)`** — returns `5,000,000 - circulatingSupply` (used to enforce the per-stock share cap on buys).
+
+---
 
 ## Chart Generation
-The `generateChart` helper normalizes historical prices to a canvas by:
-- Mapping prices to an x-axis spanning the canvas width.
-- Scaling y positions by `(price - min) / (max - min)`.
-- Drawing a simple line chart with labelled min/max.
+
+The `generateChart(ticker)` helper renders a 800×400 canvas line chart of the last 24 hourly price entries:
+
+- Background: `#2f3136` (Discord dark theme).
+- Line colour: `#57f287` (green), 3px stroke.
+- X-axis: evenly spaced across the canvas width.
+- Y-axis: normalized by `(price - min) / (max - min)`.
+- Labels: ticker name, min price, max price.
+
+Returns a PNG buffer.
+
+---
+
+## Exported API
+
+| Function                          | Description                                  |
+|-----------------------------------|----------------------------------------------|
+| `initStocks()`                    | Seed default stocks if missing               |
+| `updateAllPrices(client)`         | Hourly price recalculation                   |
+| `startPriceUpdates(client)`       | Schedule the hourly cron job                 |
+| `getStock(ticker)`                | Fetch a single stock document                |
+| `getMarket()`                     | Fetch all stocks sorted by price descending  |
+| `buyStock(userId, username, ticker, quantity)` | Execute a buy                   |
+| `sellStock(userId, ticker, quantity)` | Execute a sell                           |
+| `getPortfolio(userId)`            | Return a user's holdings                     |
+| `getRemainingSharesForTicker(ticker)` | Shares still available for purchase      |
+| `generateChart(ticker)`           | Render a 24h price-history PNG               |
+| `wipeStocks()`                    | **Owner only** — delete all stock documents  |
+| `wipePortfolios()`                | **Owner only** — delete all portfolio documents |
 
 ---
 
