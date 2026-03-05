@@ -8,7 +8,7 @@ export const data = new SlashCommandBuilder()
   .setName('leaderboard')
   .setDescription('Top 10 richest users in the server');
 
-export async function execute(interaction) {
+export async function execute(interaction, client) {
   await interaction.deferReply();
 
   try {
@@ -50,23 +50,27 @@ export async function execute(interaction) {
 
     for (let i = 0; i < top10.length; i++) {
       const { user, portfolioValue, netWorth } = top10[i];
-      
+
       // Fetch Discord user for profile picture
       let discordUser;
       try {
-        discordUser = await interaction.client.users.fetch(user.userId);
+        discordUser = await client.users.fetch(user.userId);
       } catch (err) {
         console.error(`Could not fetch user ${user.userId}`);
       }
 
+      // Check high-roller status
+      const isHighRoller = user.inventory && user.inventory.includes('casino_membership');
+
       const embed = new EmbedBuilder()
-        .setColor(0x57f287)
-        .setTitle(`#${i + 1} • ${user.username}`)
+        .setColor(isHighRoller ? 0xf1c40f : 0x57f287)
+        .setTitle(`#${i + 1} • ${user.username}${isHighRoller ? ' 🥇 High-Roller' : ''}`)
         .setThumbnail(discordUser?.displayAvatarURL({ size: 256 }) || null)
         .addFields(
           { name: 'Balance', value: `${user.balance.toLocaleString()} NEXI`, inline: true },
           { name: 'Portfolio', value: `${portfolioValue.toLocaleString()} NEXI`, inline: true },
-          { name: 'Net Worth', value: `${netWorth.toLocaleString()} NEXI`, inline: true }
+          { name: 'Net Worth', value: `${netWorth.toLocaleString()} NEXI`, inline: true },
+          ...(isHighRoller ? [{ name: 'Status', value: 'High-Roller', inline: true }] : [])
         );
 
       if (discordUser) {

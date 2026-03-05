@@ -36,11 +36,9 @@ export async function execute(interaction, client) {
     listeners[eventName].filters = {};
   }
 
-  // Simple example: store selected filter type (expand this later)
   listeners[eventName].filters[selectedValue] = {
     type: selectedValue,
     addedAt: new Date().toISOString(),
-    // Add more details (e.g. user ID, text pattern) via modal next
   };
 
   try {
@@ -50,24 +48,8 @@ export async function execute(interaction, client) {
     return interaction.update({ content: 'Failed to save filter.', components: [], embeds: [] });
   }
 
-  const embed = new EmbedBuilder()
-    .setColor('#57F287')
-    .setTitle(`Filter Added • ${eventName}`)
-    .setDescription(`Added **${selectedValue}** filter type.\n\nYou can add more or configure details.`);
-
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`listener_proceed_${selectedValue}_${eventName}`)
-      .setLabel('Add Details')
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId(`listener_cancel_${eventName}`)
-      .setLabel('Cancel')
-      .setStyle(ButtonStyle.Secondary)
-  );
-
-  await interaction.update({
-    embeds: [embed],
-    components: [row],
-  }).catch(console.error);
+  // Immediately show modal for details
+  const { buildModal } = await import('../modals/filterDetailsModal.js');
+  const modal = buildModal(selectedValue, eventName);
+  await interaction.showModal(modal);
 }

@@ -16,22 +16,16 @@ const COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
 
 export const data = new SlashCommandBuilder()
   .setName('slots')
-  .setDescription('Play the slot machine - gamble NEXI Coins!')
-  .addIntegerOption(option =>
-    option
-      .setName('bet')
-      .setDescription('Amount to bet (1-500 NEXI Coins)')
-      .setMinValue(1)
-      .setMaxValue(500)
-      .setRequired(true)
-  );
+  .setDescription('[DEPRECATED] Use /casino slots instead.')
 
 export async function execute(interaction) {
+
   await interaction.deferReply();
 
   const bet = interaction.options.getInteger('bet', true);
+  const isHighRoller = !!interaction.__highRoller;
 
-  if (bet < 1 || bet > 500) {
+  if (!isHighRoller && (bet < 1 || bet > 500)) {
     return interaction.editReply({ content: 'Bet must be between 1 and 500 NEXI Coins.', flags: 64 });
   }
 
@@ -63,20 +57,18 @@ export async function execute(interaction) {
   const reel2 = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
   const reel3 = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
 
-  const reels = [reel1, reel2, reel3];
-
   // Check win
   let payout = 0;
   let winType = 'loss';
 
   if (reel1 === reel2 && reel2 === reel3) {
     // Jackpot – all three same
-    payout = bet * reel1.payout * 2; // bonus multiplier for triple match
-    winType = 'jackpot';
+    payout = bet * reel1.payout * 2 * (isHighRoller ? 1.5 : 1); // bonus multiplier for triple match
+    winType = isHighRoller ? 'high-roller jackpot' : 'jackpot';
   } else if (reel1 === reel2 || reel2 === reel3 || reel1 === reel3) {
     // Partial match (two same)
-    payout = bet * reel1.payout;
-    winType = 'partial';
+    payout = bet * reel1.payout * (isHighRoller ? 1.5 : 1);
+    winType = isHighRoller ? 'high-roller partial' : 'partial';
   }
 
   // Update balance
@@ -84,27 +76,26 @@ export async function execute(interaction) {
     await addCoins(interaction.user.id, payout);
   }
 
-  // Update last spin time
   user.lastSlots = now;
   await user.save();
 
-  // Refresh user for accurate balance display
   const updatedUser = await getUser(interaction.user.id, interaction.user.username);
 
   // Build result embed
   const embed = new EmbedBuilder()
     .setColor(payout > 0 ? 0x57f287 : 0xed4245)
-    .setTitle(payout > 0 ? '🎰 JACKPOT!' : '🎰 Slot Machine')
+    .setTitle(payout > 0 ? (isHighRoller ? '🎰 HIGH-ROLLER JACKPOT!' : '🎰 JACKPOT!') : '🎰 Slot Machine')
     .setDescription(
       `**${reel1.emoji} | ${reel2.emoji} | ${reel3.emoji}**\n\n` +
       (payout > 0
-        ? `You won **${payout.toLocaleString()}** NEXI Coins!`
+        ? `You won **${payout.toLocaleString()}** NEXI Coins!${isHighRoller ? ' (High-Roller Bonus Applied)' : ''}`
         : 'Better luck next time...')
     )
     .addFields(
       { name: 'Bet', value: `${bet.toLocaleString()}`, inline: true },
       { name: 'Payout', value: payout > 0 ? `+${payout.toLocaleString()}` : '0', inline: true },
-      { name: 'New Balance', value: updatedUser.balance.toLocaleString(), inline: true }
+      { name: 'New Balance', value: updatedUser.balance.toLocaleString(), inline: true },
+      ...(isHighRoller ? [{ name: 'Status', value: 'High-Roller', inline: true }] : [])
     )
     .setFooter({ text: `Spun by ${interaction.user.tag}` })
     .setTimestamp();

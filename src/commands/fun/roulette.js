@@ -4,34 +4,7 @@ import { getUser, removeCoins, addCoins, addToHouse } from '../../services/econo
 
 export const data = new SlashCommandBuilder()
   .setName('roulette')
-  .setDescription('Bet on roulette — higher risk, higher reward (up to 100,000)')
-  .addIntegerOption(option =>
-    option
-      .setName('bet')
-      .setDescription('Amount to bet (1 - 100,000 NEXI Coins)')
-      .setRequired(true)
-      .setMinValue(1)
-      .setMaxValue(100000)
-  )
-  .addStringOption(option =>
-    option
-      .setName('choice')
-      .setDescription('What you are betting on')
-      .setRequired(true)
-      .addChoices(
-        { name: 'Red', value: 'red' },
-        { name: 'Black', value: 'black' },
-        { name: 'Number (0-36)', value: 'number' }
-      )
-  )
-  .addIntegerOption(option =>
-    option
-      .setName('number')
-      .setDescription('Number to bet on (0-36) — required if choice is Number')
-      .setMinValue(0)
-      .setMaxValue(36)
-      .setRequired(false)
-  );
+  .setDescription('[DEPRECATED] Use /casino roulette instead.');
 
 function getColorForNumber(n) {
   if (n === 0) return 'green';
@@ -40,13 +13,15 @@ function getColorForNumber(n) {
 }
 
 export async function execute(interaction) {
+
   await interaction.deferReply();
 
   const bet = interaction.options.getInteger('bet', true);
   const choice = interaction.options.getString('choice', true);
   const numberChoice = interaction.options.getInteger('number');
+  const isHighRoller = !!interaction.__highRoller;
 
-  if (bet < 1 || bet > 100000) {
+  if (!isHighRoller && (bet < 1 || bet > 100000)) {
     return interaction.editReply({ content: 'Bet must be between 1 and 100,000 NEXI Coins.', flags: 64 });
   }
 

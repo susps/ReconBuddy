@@ -1,176 +1,129 @@
 // src/services/stockMarket.js
+import mongoose from 'mongoose';
 import Stock from '../models/Stock.js';
-import Portfolio from '../models/Portfolio.js';
-import User from '../models/User.js';
 import cron from 'node-cron';
 import { createCanvas } from 'canvas';
-import { getUser, addCoins, removeCoins } from './economy.js';
 import logger from '../utils/logger.js';
+import { getUser, addCoins, removeCoins } from './economy.js';
 
-// Stock cap: maximum total shares in circulation per stock listing
-const STOCK_CAP = 50000;
+// ─────────────────────────────────────────────────────────────────────────────
+// Mongoose Models
+// ─────────────────────────────────────────────────────────────────────────────
 
-// Initialize default stocks on startup
+const portfolioSchema = new mongoose.Schema({
+  userId: { type: String, required: true, unique: true },
+  stocks: [{
+    ticker: { type: String, required: true },
+    quantity: { type: Number, default: 0 },
+    buyPrice: { type: Number, default: 0 },
+  }],
+  createdAt: { type: Date, default: Date.now },
+});
+
+const Portfolio = mongoose.models.Portfolio || mongoose.model('Portfolio', portfolioSchema);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Default stocks initialization
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function initStocks() {
   try {
     logger.info('[STOCK] Ensuring default stocks exist...');
 
     const defaults = [
-      {
-        ticker: 'NEXI',
-        name: 'NEXI Coin',
-        price: 150,
-        volatility: 0.12,
-        factors: { memberGrowth: 0.15, messageActivity: 0.25 },
-      },
-      { ticker: 'TECH', name: 'Tech Giants Inc.', price: 300, volatility: 0.08 },
-      { ticker: 'GME', name: 'GameStop Corp.', price: 50, volatility: 0.2 },
-      { ticker: 'CRYPTO', name: 'Crypto Index', price: 200, volatility: 0.15 },
-      { ticker: 'RETAIL', name: 'Retail Leaders', price: 80, volatility: 0.1 },
-      { ticker: 'ENERGY', name: 'Energy Co.', price: 120, volatility: 0.09 },
-      { ticker: 'HEALTH', name: 'Health Corp.', price: 90, volatility: 0.07 },
-      { ticker: 'FINANCE', name: 'Finance Group', price: 110, volatility: 0.06 },
+      { ticker: 'NEXI', name: 'NEXI Coin', price: 150, volatility: 0.10 },
+      { ticker: 'TECH', name: 'Tech Giants Inc.', price: 280, volatility: 0.08 },
+      { ticker: 'GME', name: 'GameStop Corp.', price: 45, volatility: 0.18 },
+      { ticker: 'CRYPTO', name: 'Crypto Index', price: 220, volatility: 0.15 },
+      { ticker: 'RETAIL', name: 'Retail Leaders', price: 75, volatility: 0.09 },
     ];
 
     let created = 0;
     for (const def of defaults) {
-      const found = await Stock.findOne({ ticker: def.ticker });
-      if (!found) {
+      const exists = await Stock.findOne({ ticker: def.ticker });
+      if (!exists) {
         await Stock.create(def);
         created++;
-        logger.info(`[STOCK] Created default stock ${def.ticker}`);
+        logger.info(`[STOCK] Created default stock: ${def.ticker}`);
       }
     }
 
-    if (created === 0) logger.info('[STOCK] All default stocks already exist, skipping creation');
-    else logger.info(`[STOCK] ✓ Default stocks initialized (${created} created)`);
-  } catch (error) {
-    logger.error('[STOCK] Error initializing stocks:', error);
+    logger.info(`[STOCK] Initialization complete (${created} new stocks created)`);
+  } catch (err) {
+    logger.error('[STOCK INIT] Failed:', err.message);
   }
 }
 
-// Update all stock prices (run hourly)
+// ─────────────────────────────────────────────────────────────────────────────
+// Price update algorithm (hourly) – minimal NEXI influence
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function updateAllPrices(client) {
-  const stocks = await Stock.find({});
+  try {
+    const stocks = await Stock.find({});
+    logger.info(`[STOCK] Starting hourly price update for ${stocks.length} stocks...`);
 
-  // Gather server/global metrics once per tick (used as market signals)
-  const totalMembers = client.guilds.cache.reduce((acc, g) => acc + g.memberCount, 0);
-  const onlineMembers = client.guilds.cache.reduce((acc, g) => acc + g.members.cache.filter(m => m.presence?.status === 'online').size, 0);
-  const totalGuilds = client.guilds.cache.size;
-  const textChannels = client.channels.cache.filter(c => c.isTextBased()).size;
+    for (const stock of stocks) {
+      let newPrice = stock.price;
 
-  for (const stock of stocks) {
-    let newPrice = stock.price;
+      // 1. Random fluctuation
+      const randomPct = (Math.random() - 0.5) * stock.volatility * 2;
+      newPrice *= (1 + randomPct);
 
-    // Configuration: caps and scaling
-    const MAX_PCT_CHANGE = 0.05; // max 5% per tick
-    const MIN_PRICE = 1;
+      // 2. Light upward trend
+      const trendPct = 0.0015;
+      newPrice *= (1 + trendPct);
 
-    // Base random fluctuation (percent-based)
-    const baseFluctuationPct = (Math.random() - 0.5) * (stock.volatility || 0.1);
-    newPrice = Math.max(MIN_PRICE, newPrice * (1 + baseFluctuationPct));
+      // 3. Gentle mean reversion
+      const longTermMean = stock.ticker === 'NEXI' ? 160 : 200;
+      const deviation = (longTermMean - newPrice) / longTermMean;
+      newPrice += deviation * 0.8;
 
-    // Market signal calculation (applies to all stocks)
-    // Get previous metrics (store in stock.metadata if available)
-    const prevMembers = stock.metadata?.prevMembers || totalMembers;
-    const prevGuilds = stock.metadata?.prevGuilds || totalGuilds;
+      // 4. NEXI Coin – VERY MINIMAL server influence (as requested)
+      if (stock.ticker === 'NEXI') {
+        const totalMembers = client.guilds.cache.reduce((sum, g) => sum + g.memberCount, 0);
+        const memberImpact = (totalMembers / 10000) * 0.008; // tiny effect
+        newPrice *= (1 + memberImpact);
+      }
 
-    // Calculate deltas (rates of change)
-    const memberDelta = totalMembers - prevMembers;
-    const guildDelta = totalGuilds - prevGuilds;
-    const onlineRatio = totalMembers > 0 ? onlineMembers / totalMembers : 0;
+      // Safety bounds
+      newPrice = Math.max(5, Math.round(newPrice * 100) / 100);
 
-    // Convert impacts to percentage-of-price (so large prices don't explode)
-    const memberGrowthFactor = stock.factors?.memberGrowth || 0.02; // smaller default for non-community stocks
-    const messageActivityFactor = stock.factors?.messageActivity || 0.02;
+      // Add to history (keep last 24)
+      stock.history.push({ timestamp: new Date(), price: newPrice });
+      if (stock.history.length > 24) stock.history.shift();
 
-    const memberGrowthPct = (memberDelta / Math.max(1, prevMembers)) * memberGrowthFactor * 0.05;
-    const guildGrowthPct = (guildDelta / Math.max(1, prevGuilds)) * 0.03;
-    const engagementPct = onlineRatio * 0.02;
-    const channelActivityPct = (textChannels / Math.max(1, totalGuilds)) * messageActivityFactor * 0.02;
+      stock.price = newPrice;
+      stock.lastUpdated = new Date();
 
-    // Aggregate percentage impact
-    let totalImpactPct = memberGrowthPct + guildGrowthPct + engagementPct + channelActivityPct;
-
-    // Mean reversion: if price is far above recent average, apply negative pressure (and vice-versa)
-    const histPrices = stock.history?.map(h => h.price) || [];
-    if (histPrices.length >= 3) {
-      const avg = histPrices.reduce((a, b) => a + b, 0) / histPrices.length;
-      const deviation = (stock.price - avg) / Math.max(1, avg);
-      // Apply a small opposing force proportional to deviation
-      totalImpactPct += -Math.sign(deviation) * Math.min(0.02, Math.abs(deviation) * 0.05);
+      await stock.save();
     }
 
-    // Liquidity scaling: higher-priced / low-liquidity assets should move less
-    const liquidityScale = 1 / (1 + Math.log10(Math.max(1, stock.price)));
-    totalImpactPct *= liquidityScale;
-
-    // Cap impact to configured max per tick
-    const cappedPct = Math.max(-MAX_PCT_CHANGE, Math.min(MAX_PCT_CHANGE, totalImpactPct));
-
-    newPrice = Math.max(MIN_PRICE, Math.round(newPrice * (1 + cappedPct)));
-
-    // Update metadata for next calculation
-    stock.metadata = {
-      prevMembers: totalMembers,
-      prevGuilds: totalGuilds,
-      lastEngagementRatio: onlineRatio,
-    };
-
-    newPrice = Math.max(1, Math.round(newPrice));
-
-    // Add to history (keep last 24)
-    stock.history.push({ timestamp: new Date(), price: newPrice });
-    if (stock.history.length > 24) stock.history.shift();
-
-    stock.price = newPrice;
-    stock.lastUpdated = new Date();
-
-    await stock.save();
+    logger.info('[STOCK] Hourly price update completed successfully');
+  } catch (err) {
+    logger.error('[STOCK UPDATE] Failed:', err.message);
   }
-
-  console.log('[STOCK] All prices updated');
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
 // Start hourly price updates
-export function startPriceUpdates(client) {
-  // Run at the top of every hour to prevent runaway minute-by-minute compounding
-  cron.schedule('0 * * * *', async () => {
-    logger.info('[STOCK CRON] Starting price update...');
-    await updateAllPrices(client);
-    logger.info('[STOCK CRON] Update complete');
-  });
+// ─────────────────────────────────────────────────────────────────────────────
 
+export function startPriceUpdates(client) {
+  cron.schedule('0 * * * *', () => updateAllPrices(client));
   logger.info('[STOCK] Price update cron scheduled (hourly)');
 }
 
-// Get single stock
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper functions
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function getStock(ticker) {
   return await Stock.findOne({ ticker: ticker.toUpperCase() });
 }
 
-// Get all stocks
 export async function getMarket() {
   return await Stock.find({}).sort({ price: -1 });
-}
-
-// Calculate total shares in circulation for a specific stock
-async function getTotalSharesForTicker(ticker) {
-  const portfolios = await Portfolio.find({});
-  let total = 0;
-  for (const portfolio of portfolios) {
-    const stock = portfolio.stocks.find(s => s.ticker === ticker);
-    if (stock) {
-      total += stock.quantity;
-    }
-  }
-  return total;
-}
-
-// Get remaining shares available for a stock
-export async function getRemainingSharesForTicker(ticker) {
-  const total = await getTotalSharesForTicker(ticker);
-  return STOCK_CAP - total;
 }
 
 // Buy stock
@@ -178,24 +131,20 @@ export async function buyStock(userId, username, ticker, quantity) {
   const stock = await getStock(ticker);
   if (!stock) throw new Error('Stock not found');
 
-  const cost = stock.price * quantity;
+  // Enforce stock limit
+  const remaining = await getRemainingSharesForTicker(ticker);
+  if (quantity > remaining) {
+    throw new Error(`Not enough shares available. Only ${remaining.toLocaleString()} left (limit: 5,000,000 per stock).`);
+  }
 
+  const cost = Math.round(stock.price * quantity);
   const user = await getUser(userId, username);
   if (user.balance < cost) throw new Error('Insufficient balance');
 
-  // Check per-stock cap
-  const currentTotal = await getTotalSharesForTicker(ticker);
-  if (currentTotal + quantity > STOCK_CAP) {
-    const remaining = STOCK_CAP - currentTotal;
-    throw new Error(`Stock cap reached for ${ticker}. Maximum buy: ${remaining} shares. Current total: ${currentTotal}/${STOCK_CAP}`);
-  }
-
-  await removeCoins(userId, cost, username);
+  await removeCoins(userId, cost);
 
   let portfolio = await Portfolio.findOne({ userId });
-  if (!portfolio) {
-    portfolio = new Portfolio({ userId, stocks: [] });
-  }
+  if (!portfolio) portfolio = new Portfolio({ userId, stocks: [] });
 
   const existing = portfolio.stocks.find(s => s.ticker === ticker);
   if (existing) {
@@ -203,15 +152,10 @@ export async function buyStock(userId, username, ticker, quantity) {
     existing.buyPrice = ((existing.buyPrice * existing.quantity) + (stock.price * quantity)) / newQty;
     existing.quantity = newQty;
   } else {
-    portfolio.stocks.push({
-      ticker,
-      quantity,
-      buyPrice: stock.price,
-    });
+    portfolio.stocks.push({ ticker, quantity, buyPrice: stock.price });
   }
 
   await portfolio.save();
-
   return { cost, newBalance: user.balance - cost };
 }
 
@@ -226,7 +170,7 @@ export async function sellStock(userId, ticker, quantity) {
   const holding = portfolio.stocks.find(s => s.ticker === ticker);
   if (!holding || holding.quantity < quantity) throw new Error('Insufficient shares');
 
-  const revenue = stock.price * quantity;
+  const revenue = Math.round(stock.price * quantity);
 
   holding.quantity -= quantity;
   if (holding.quantity <= 0) {
@@ -234,23 +178,44 @@ export async function sellStock(userId, ticker, quantity) {
   }
 
   await portfolio.save();
-  
-  // Fetch user to get username for addCoins
-  const user = await User.findOne({ userId });
-  if (!user) throw new Error('User not found');
-  
-  await addCoins(userId, revenue, user.username);
+  await addCoins(userId, revenue);
 
   return { revenue, remaining: holding.quantity };
 }
 
-// Get user portfolio
+// Get portfolio
 export async function getPortfolio(userId) {
   const portfolio = await Portfolio.findOne({ userId });
   return portfolio?.stocks || [];
 }
 
-// Generate chart (last 24 hours)
+// Calculate how many shares remain available for a given ticker
+export async function getRemainingSharesForTicker(ticker) {
+  // total supply is now 5,000,000 shares per stock
+  const portfolios = await Portfolio.find({ 'stocks.ticker': ticker });
+  let used = 0;
+  for (const p of portfolios) {
+    const holding = p.stocks.find(s => s.ticker === ticker);
+    if (holding) used += holding.quantity;
+  }
+  return Math.max(0, 5000000 - used);
+}
+
+// ---------- destructive helpers (owner only) ----------
+export async function wipeStocks() {
+  await Stock.deleteMany({});
+  logger.warn('[STOCK] All stocks collection wiped by owner action');
+}
+
+export async function wipePortfolios() {
+  await Portfolio.deleteMany({});
+  logger.warn('[STOCK] All portfolios wiped by owner action');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CANVAS CHART – Your original code fully restored
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function generateChart(ticker) {
   const stock = await getStock(ticker);
   if (!stock || stock.history.length < 2) throw new Error('Not enough price history');
@@ -290,3 +255,13 @@ export async function generateChart(ticker) {
 
   return canvas.toBuffer();
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Auto-start on import
+// ─────────────────────────────────────────────────────────────────────────────
+
+initStocks().catch(err => logger.error('[STOCK INIT] Failed:', err.message));
+// startPriceUpdates is intentionally not invoked here because it requires a
+// Discord client instance.  The ready event handler passes the client and
+// schedules the cron job instead.
+// startPriceUpdates().catch(err => logger.error('[STOCK CRON] Failed to start:', err.message));

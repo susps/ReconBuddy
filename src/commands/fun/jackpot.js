@@ -4,22 +4,16 @@ import { getUser, removeCoins, addCoins, addToHouse } from '../../services/econo
 
 export const data = new SlashCommandBuilder()
   .setName('jackpot')
-  .setDescription('Buy a jackpot ticket — very high variance payouts (up to 100,000 bet)')
-  .addIntegerOption(option =>
-    option
-      .setName('bet')
-      .setDescription('Amount to bet (1 - 100,000 NEXI Coins)')
-      .setRequired(true)
-      .setMinValue(1)
-      .setMaxValue(100000)
-  );
+  .setDescription('[DEPRECATED] Use /casino jackpot instead.');
 
 export async function execute(interaction) {
+
   await interaction.deferReply();
 
   const bet = interaction.options.getInteger('bet', true);
+  const isHighRoller = !!interaction.__highRoller;
 
-  if (bet < 1 || bet > 100000) {
+  if (!isHighRoller && (bet < 1 || bet > 100000)) {
     return interaction.editReply({ content: 'Bet must be between 1 and 100,000 NEXI Coins.', flags: 64 });
   }
 

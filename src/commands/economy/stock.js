@@ -1,12 +1,13 @@
 // src/commands/economy/stock.js
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } from 'discord.js';
 import { 
   getStock, 
   buyStock, 
   sellStock, 
   getPortfolio, 
   getMarket,
-  getRemainingSharesForTicker
+  getRemainingSharesForTicker,
+  generateChart
 } from '../../services/stockMarket.js';
 import { getUser } from '../../services/economy.js';
 
@@ -59,13 +60,28 @@ export const data = new SlashCommandBuilder()
       .setName('history')
       .setDescription('View recent price history for a stock')
       .addStringOption(opt => opt.setName('ticker').setDescription('Stock ticker (e.g. NEXI)').setRequired(true))
+  )
+  
+  // View price chart (canvas image)
+  .addSubcommand(sub =>
+    sub
+      .setName('chart')
+      .setDescription('View a price chart for a stock (last 24 hours)')
+      .addStringOption(opt => opt.setName('ticker').setDescription('Stock ticker (e.g. NEXI)').setRequired(true))
   );
 
 export async function execute(interaction) {
-  await interaction.deferReply({ flags: 64 });
-
   const sub = interaction.options.getSubcommand();
+  // make buy/sell responses private, others public by default
+  const ephemeral = ['buy', 'sell'].includes(sub);
+  await interaction.deferReply({ ephemeral });
+
   const ticker = interaction.options.getString('ticker')?.toUpperCase();
+
+  // sanity check (shouldn't trigger because options are required on subcommands)
+  if ((sub === 'buy' || sub === 'sell' || sub === 'view') && !ticker) {
+    return interaction.editReply({ content: '❌ Ticker symbol is required.', ephemeral: true });
+  }
 
   if (sub === 'market') {
     const stocks = await getMarket();
@@ -89,7 +105,7 @@ export async function execute(interaction) {
 
       embed.addFields({
         name: `${stock.ticker} - ${stock.name}`,
-        value: `Price: **$${stock.price.toLocaleString()}**\n24h Change: ${change24h > 0 ? '+' : ''}${change24h}%\nVolatility: ${(stock.volatility * 100).toFixed(1)}%\nRemaining: **${remaining.toLocaleString()} / 50,000** shares`,
+        value: `Price: **$${stock.price.toLocaleString()}**\n24h Change: ${change24h > 0 ? '+' : ''}${change24h}%\nVolatility: ${(stock.volatility * 100).toFixed(1)}%\nRemaining: **${remaining.toLocaleString()} / 5,000,000** shares`,
         inline: true,
       });
     }
@@ -218,41 +234,22 @@ export async function execute(interaction) {
   }
 
   if (sub === 'chart') {
-    const stock = await getStock(ticker);
-    if (!stock || stock.history.length < 2) {
-      return interaction.editReply({ content: 'Not enough price history for this stock.', flags: 64 });
+    try {
+      const chartBuffer = await generateChart(ticker);
+      
+      const attachment = new AttachmentBuilder(chartBuffer, { name: `${ticker}_chart.png` });
+      
+      const embed = new EmbedBuilder()
+        .setColor(0x5865f2)
+        .setTitle(`${ticker} Price Chart (24h)`)
+        .setDescription('Price movement over the last 24 hours')
+        .setImage(`attachment://${ticker}_chart.png`)
+        .setTimestamp();
+
+      return interaction.editReply({ embeds: [embed], files: [attachment] });
+    } catch (error) {
+      return interaction.editReply({ content: `Error generating chart: ${error.message}`, flags: 64 });
     }
-
-    const history = stock.history.slice(-10); // last 10 updates for readability
-
-    const embed = new EmbedBuilder()
-      .setColor(0x5865f2)
-      .setTitle(`${ticker} Price History`)
-      .setDescription('Last 10 price updates (approximate 24h window)');
-
-    let minPrice = Infinity;
-    let maxPrice = -Infinity;
-
-    history.forEach((entry, index) => {
-      const time = entry.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const price = entry.price;
-      minPrice = Math.min(minPrice, price);
-      maxPrice = Math.max(maxPrice, price);
-
-      embed.addFields({
-        name: `#${index + 1} - ${time}`,
-        value: `$${price.toLocaleString()}`,
-        inline: true,
-      });
-    });
-
-    embed.addFields({
-      name: 'Range',
-      value: `$${minPrice.toLocaleString()} - $${maxPrice.toLocaleString()}`,
-      inline: false,
-    });
-
-    return interaction.editReply({ embeds: [embed] });
   }
 
   if (sub === 'history') {

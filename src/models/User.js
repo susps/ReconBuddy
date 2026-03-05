@@ -8,7 +8,7 @@ const userSchema = new mongoose.Schema({
   lastDaily: { type: Date, default: null },
   dailyStreak: { type: Number, default: 0 },
   lastWork: { type: Date, default: null },
-  inventory: { type: [String], default: [] },
+  inventory: { type: [mongoose.Schema.Types.Mixed], default: [] },
   createdAt: { type: Date, default: Date.now },
 });
 

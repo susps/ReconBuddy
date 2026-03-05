@@ -3,6 +3,7 @@ import { Events, EmbedBuilder } from 'discord.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { checkMessageRateLimit } from '../services/antiSpam.js';
+import { dispatchEvent } from '../utils/eventDispatcher.js';
 
 export const name = Events.MessageCreate;
 export const once = false;
@@ -15,6 +16,9 @@ export async function execute(message, client) {
   if (actionTaken) {
     console.log(`Anti-spam action taken on ${message.author.tag} in ${message.guild.name}`);
   }
+
+  // Log event
+  await dispatchEvent('messageCreate', { message }, client);
 
   // Load listener config
   const listenersFile = path.join(process.cwd(), 'listeners.json');

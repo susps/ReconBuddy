@@ -11,26 +11,20 @@ import { getUser, removeCoins, addCoins } from '../../services/economy.js';
 
 export const data = new SlashCommandBuilder()
   .setName('coinflip')
-  .setDescription('Flip a coin – optionally bet NEXI Coins against another user')
-  .addUserOption(option =>
-    option
-      .setName('opponent')
-      .setDescription('User to coinflip against (optional – for bets)')
-      .setRequired(false)
-  )
-  .addIntegerOption(option =>
-    option
-      .setName('amount')
-      .setDescription('Amount of NEXI Coins to bet (optional – requires opponent)')
-      .setRequired(false)
-      .setMinValue(1)
-  );
+  .setDescription('[DEPRECATED] Use /casino coinflip instead.');
 
 export async function execute(interaction) {
+
   await interaction.deferReply();
 
   const opponent = interaction.options.getUser('opponent');
   const amount = interaction.options.getInteger('amount') || 0;
+  const isHighRoller = !!interaction.__highRoller;
+
+  // If you want to enforce a max bet for non-high-rollers, add here:
+  // if (!isHighRoller && amount > 100000) {
+  //   return interaction.editReply({ content: 'Bet must be 100,000 NEXI Coins or less.', flags: 64 });
+  // }
 
   // ─── Simple flip (no bet) ───────────────────────────────────────────────
   if (!opponent || amount <= 0) {

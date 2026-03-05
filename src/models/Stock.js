@@ -14,4 +14,4 @@ const stockSchema = new mongoose.Schema({
   factors: { type: Object, default: { memberGrowth: 0.1, messageActivity: 0.2 } }, // for NEXI
 });
 
-export default mongoose.model('Stock', stockSchema);
+export default mongoose.models.Stock || mongoose.model('Stock', stockSchema);
