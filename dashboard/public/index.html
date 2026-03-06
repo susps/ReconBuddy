@@ -30,6 +30,10 @@
         .pnl-pos { color: rgb(52 211 153); }
         .pnl-neg { color: rgb(248 113 113); }
         .sparkline { display: inline-block; vertical-align: middle; }
+        .admin-tab { display: block; }
+        .admin-tab.hidden { display: none; }
+        .listener-card { transition: all 0.2s ease; }
+        .listener-card:hover { border-color: rgb(99 102 241 / 0.5); }
     </style>
 </head>
 <body class="bg-zinc-950 text-zinc-200 min-h-screen">
@@ -68,6 +72,13 @@
                        class="nav-btn flex items-center gap-x-2 bg-zinc-800 hover:bg-zinc-700 px-5 py-2 rounded-2xl text-sm font-medium text-zinc-200">
                         <i class="fas fa-chart-bar"></i>
                         <span>Dashboard</span>
+                    </button>
+                </div>
+                <div id="navAdmin" class="hidden">
+                    <button onclick="showPage('admin')" id="navAdminBtn"
+                       class="nav-btn flex items-center gap-x-2 bg-zinc-800 hover:bg-zinc-700 px-5 py-2 rounded-2xl text-sm font-medium text-zinc-200">
+                        <i class="fas fa-shield-halved"></i>
+                        <span>Admin</span>
                     </button>
                 </div>
                 <div id="navUser">
@@ -404,6 +415,265 @@
 
         </div><!-- /dashboardPage -->
 
+        <!-- ═══ Admin Page ═══ -->
+        <div id="adminPage" class="page-section">
+            <div class="flex justify-between items-end mb-8">
+                <div>
+                    <h2 class="text-4xl font-semibold tracking-tight">Server Admin</h2>
+                    <p class="text-zinc-400 mt-1">Manage guild settings, listeners, and warnings</p>
+                </div>
+                <div class="flex items-center gap-x-3">
+                    <select id="adminGuildSelect" onchange="onAdminGuildChange()"
+                            class="bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-2 text-sm text-white focus:outline-none focus:border-violet-500 min-w-[200px]">
+                        <option value="">Select a server...</option>
+                    </select>
+                    <button onclick="loadAdminGuild()" class="bg-zinc-800 hover:bg-zinc-700 px-4 py-2 rounded-2xl text-sm font-medium transition-colors">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div id="adminContent" class="hidden">
+                <!-- Admin Tabs -->
+                <div class="flex gap-x-2 mb-6">
+                    <button onclick="showAdminTab('settings')" id="adminTabSettings"
+                            class="nav-btn active px-5 py-2 rounded-2xl text-sm font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200">
+                        <i class="fas fa-cog mr-2"></i>Settings
+                    </button>
+                    <button onclick="showAdminTab('listeners')" id="adminTabListeners"
+                            class="nav-btn px-5 py-2 rounded-2xl text-sm font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200">
+                        <i class="fas fa-satellite-dish mr-2"></i>Listeners
+                    </button>
+                    <button onclick="showAdminTab('warnings')" id="adminTabWarnings"
+                            class="nav-btn px-5 py-2 rounded-2xl text-sm font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>Warnings
+                    </button>
+                </div>
+
+                <!-- ── Settings Tab ── -->
+                <div id="adminSettingsTab" class="admin-tab">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                        <!-- Welcome Settings -->
+                        <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+                            <h3 class="text-lg font-semibold flex items-center gap-x-2 mb-4">
+                                <i class="fas fa-door-open text-emerald-400"></i> Welcome Settings
+                            </h3>
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-sm text-zinc-300">Enabled</label>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="welcomeEnabled" class="sr-only peer">
+                                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label class="text-xs text-zinc-500 uppercase tracking-wider">Welcome Channel</label>
+                                    <select id="welcomeChannel" class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-violet-500 text-sm">
+                                        <option value="">None</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-xs text-zinc-500 uppercase tracking-wider">Welcome Message</label>
+                                    <textarea id="welcomeMessage" rows="2" maxlength="500" placeholder="Welcome {user} to {server}!"
+                                              class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-violet-500 text-sm resize-none"></textarea>
+                                    <p class="text-zinc-600 text-xs mt-1">Use {user} and {server} as placeholders</p>
+                                </div>
+                                <div>
+                                    <label class="text-xs text-zinc-500 uppercase tracking-wider">Background URL</label>
+                                    <input type="url" id="welcomeBg" placeholder="https://..."
+                                           class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-violet-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-zinc-500 uppercase tracking-wider">Verified Role</label>
+                                    <select id="welcomeVerifiedRole" class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-violet-500 text-sm">
+                                        <option value="">None</option>
+                                    </select>
+                                </div>
+                                <button onclick="saveWelcomeSettings()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors">
+                                    <i class="fas fa-save mr-2"></i>Save Welcome Settings
+                                </button>
+                                <div id="welcomeSaveResult" class="text-sm text-center min-h-[20px]"></div>
+                            </div>
+                        </div>
+
+                        <!-- Ticket Settings -->
+                        <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+                            <h3 class="text-lg font-semibold flex items-center gap-x-2 mb-4">
+                                <i class="fas fa-ticket text-sky-400"></i> Ticket Settings
+                            </h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="text-xs text-zinc-500 uppercase tracking-wider">Support Channel</label>
+                                    <select id="ticketSupportChannel" class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-violet-500 text-sm">
+                                        <option value="">None</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-xs text-zinc-500 uppercase tracking-wider">Log Channel</label>
+                                    <select id="ticketLogChannel" class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-violet-500 text-sm">
+                                        <option value="">None</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-xs text-zinc-500 uppercase tracking-wider">Staff Role</label>
+                                    <select id="ticketStaffRole" class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-violet-500 text-sm">
+                                        <option value="">None</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-xs text-zinc-500 uppercase tracking-wider">Close Action</label>
+                                    <select id="ticketCloseAction" class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-violet-500 text-sm">
+                                        <option value="archive">Archive</option>
+                                        <option value="delete">Delete</option>
+                                    </select>
+                                </div>
+                                <button onclick="saveTicketSettings()" class="w-full bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors">
+                                    <i class="fas fa-save mr-2"></i>Save Ticket Settings
+                                </button>
+                                <div id="ticketSaveResult" class="text-sm text-center min-h-[20px]"></div>
+                            </div>
+                        </div>
+
+                        <!-- Anti-Raid: Join Protection -->
+                        <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+                            <h3 class="text-lg font-semibold flex items-center gap-x-2 mb-4">
+                                <i class="fas fa-user-shield text-amber-400"></i> Anti-Raid: Join Protection
+                            </h3>
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-sm text-zinc-300">Enabled</label>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="arJoinEnabled" class="sr-only peer">
+                                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label class="text-xs text-zinc-500 uppercase tracking-wider">Max Joins</label>
+                                    <input type="number" id="arJoinMax" min="1" max="50" value="5"
+                                           class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-amber-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-zinc-500 uppercase tracking-wider">Time Window (seconds)</label>
+                                    <input type="number" id="arJoinWindow" min="10" max="600" value="60"
+                                           class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-amber-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-zinc-500 uppercase tracking-wider">Action</label>
+                                    <select id="arJoinAction" class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-amber-500 text-sm">
+                                        <option value="kick">Kick</option>
+                                        <option value="ban">Ban</option>
+                                        <option value="timeout">Timeout</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Anti-Raid: Message Spam -->
+                        <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+                            <h3 class="text-lg font-semibold flex items-center gap-x-2 mb-4">
+                                <i class="fas fa-comment-slash text-red-400"></i> Anti-Raid: Message Spam
+                            </h3>
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-sm text-zinc-300">Enabled</label>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="arMsgEnabled" class="sr-only peer">
+                                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label class="text-xs text-zinc-500 uppercase tracking-wider">Max Messages</label>
+                                    <input type="number" id="arMsgMax" min="3" max="50" value="8"
+                                           class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-red-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-zinc-500 uppercase tracking-wider">Time Window (seconds)</label>
+                                    <input type="number" id="arMsgWindow" min="3" max="120" value="10"
+                                           class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-red-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-zinc-500 uppercase tracking-wider">Action</label>
+                                    <select id="arMsgAction" class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-red-500 text-sm">
+                                        <option value="mute">Mute</option>
+                                        <option value="kick">Kick</option>
+                                        <option value="ban">Ban</option>
+                                        <option value="timeout">Timeout</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Combined Anti-Raid Save -->
+                    <div class="mt-4">
+                        <button onclick="saveAntiraidSettings()" class="w-full bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors">
+                            <i class="fas fa-save mr-2"></i>Save Anti-Raid Settings
+                        </button>
+                        <div id="antiraidSaveResult" class="text-sm text-center min-h-[20px] mt-2"></div>
+                    </div>
+                </div>
+
+                <!-- ── Listeners Tab ── -->
+                <div id="adminListenersTab" class="admin-tab hidden">
+                    <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 mb-6">
+                        <h3 class="text-lg font-semibold flex items-center gap-x-2 mb-4">
+                            <i class="fas fa-plus-circle text-emerald-400"></i> Add Listener
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="text-xs text-zinc-500 uppercase tracking-wider">Event</label>
+                                <select id="newListenerEvent" class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm">
+                                    <option value="">Select event...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-zinc-500 uppercase tracking-wider">Log Channel</label>
+                                <select id="newListenerChannel" class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-emerald-500 text-sm">
+                                    <option value="">Select channel...</option>
+                                </select>
+                            </div>
+                            <div class="flex items-end">
+                                <button onclick="addListener()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors">
+                                    <i class="fas fa-plus mr-2"></i>Add
+                                </button>
+                            </div>
+                        </div>
+                        <div id="listenerAddResult" class="text-sm text-center min-h-[20px] mt-2"></div>
+                    </div>
+
+                    <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+                        <h3 class="text-lg font-semibold flex items-center gap-x-2 mb-4">
+                            <i class="fas fa-list text-sky-400"></i> Active Listeners
+                            <span id="listenerCount" class="ml-auto text-xs text-zinc-500 font-mono"></span>
+                        </h3>
+                        <div id="listenersGrid" class="space-y-3">
+                            <div class="text-zinc-500 text-sm">No listeners configured</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Warnings Tab ── -->
+                <div id="adminWarningsTab" class="admin-tab hidden">
+                    <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+                        <h3 class="text-lg font-semibold flex items-center gap-x-2 mb-4">
+                            <i class="fas fa-exclamation-triangle text-red-400"></i> Server Warnings
+                            <span id="warningCount" class="ml-auto text-xs text-zinc-500 font-mono"></span>
+                        </h3>
+                        <div id="warningsGrid" class="space-y-4">
+                            <div class="text-zinc-500 text-sm">Loading warnings...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- No guild selected placeholder -->
+            <div id="adminPlaceholder" class="text-center py-16">
+                <i class="fas fa-shield-halved text-6xl text-zinc-700 mb-4"></i>
+                <p class="text-zinc-500 text-lg">Select a server you administrate to manage its settings</p>
+                <p class="text-zinc-600 text-sm mt-1">Only servers where you have Administrator permission are shown</p>
+            </div>
+        </div>
+
         <!-- Footer -->
         <div class="mt-12 text-center text-zinc-500 text-xs flex flex-col items-center gap-y-4">
             <a href="https://discord.gg/thenexus" target="_blank" rel="noopener noreferrer"
@@ -430,8 +700,10 @@
             document.getElementById('navCasinoBtn')?.classList.toggle('active', page === 'casino');
             document.getElementById('navDashboardBtn')?.classList.toggle('active', page === 'dashboard');
             document.getElementById('navStocksBtn')?.classList.toggle('active', page === 'stocks');
+            document.getElementById('navAdminBtn')?.classList.toggle('active', page === 'admin');
             if (page === 'casino') refreshCasinoBalance();
             if (page === 'stocks') loadStocksPage();
+            if (page === 'admin') loadAdminGuilds();
         }
 
         async function refreshCasinoBalance() {
@@ -896,6 +1168,13 @@
                     document.getElementById('navCasino').classList.remove('hidden');
                     document.getElementById('navStocks').classList.remove('hidden');
                     document.getElementById('navDashboard').classList.remove('hidden');
+
+                    // Show admin nav if user has admin guilds
+                    loadAdminGuilds().then(guilds => {
+                        if (guilds && guilds.length > 0) {
+                            document.getElementById('navAdmin').classList.remove('hidden');
+                        }
+                    });
                     // Build portfolio rows
                     let portfolioHtml = '<span class="text-zinc-500">No stocks</span>';
                     if (data.portfolio?.stocks?.length) {
@@ -1003,6 +1282,353 @@
             setInterval(fetchStats, 7000);
             console.log('%c✅ ReconBuddy Dashboard ready', 'color:#a78bfa; font-weight:700');
         });
+
+        // ─── Admin Panel ─────────────────────────────────────────
+        let adminGuildId = '';
+        let adminChannels = [];
+        let adminRoles = [];
+
+        async function loadAdminGuilds() {
+            try {
+                const res = await fetch('/api/admin/guilds');
+                if (!res.ok) return [];
+                const guilds = await res.json();
+                const select = document.getElementById('adminGuildSelect');
+                if (!select) return guilds;
+                select.innerHTML = '<option value="">Select a server...</option>' +
+                    guilds.map(g => `<option value="${g.id}">${g.name} (${g.memberCount} members)</option>`).join('');
+                if (adminGuildId) select.value = adminGuildId;
+                return guilds;
+            } catch { return []; }
+        }
+
+        function onAdminGuildChange() {
+            const guildId = document.getElementById('adminGuildSelect').value;
+            adminGuildId = guildId;
+            if (guildId) {
+                document.getElementById('adminContent').classList.remove('hidden');
+                document.getElementById('adminPlaceholder').classList.add('hidden');
+                loadAdminGuild();
+            } else {
+                document.getElementById('adminContent').classList.add('hidden');
+                document.getElementById('adminPlaceholder').classList.remove('hidden');
+            }
+        }
+
+        async function loadAdminGuild() {
+            if (!adminGuildId) return;
+            await Promise.all([loadGuildSettings(), loadGuildListeners(), loadGuildWarnings()]);
+        }
+
+        function showAdminTab(tab) {
+            document.querySelectorAll('.admin-tab').forEach(el => el.classList.add('hidden'));
+            document.getElementById('adminSettingsTab')?.classList.toggle('hidden', tab !== 'settings');
+            document.getElementById('adminListenersTab')?.classList.toggle('hidden', tab !== 'listeners');
+            document.getElementById('adminWarningsTab')?.classList.toggle('hidden', tab !== 'warnings');
+            document.getElementById('adminTabSettings')?.classList.toggle('active', tab === 'settings');
+            document.getElementById('adminTabListeners')?.classList.toggle('active', tab === 'listeners');
+            document.getElementById('adminTabWarnings')?.classList.toggle('active', tab === 'warnings');
+        }
+
+        function populateChannelSelect(selectId, channels, selectedId) {
+            const el = document.getElementById(selectId);
+            if (!el) return;
+            el.innerHTML = '<option value="">None</option>' +
+                channels.map(c => `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>#${c.name}</option>`).join('');
+        }
+
+        function populateRoleSelect(selectId, roles, selectedId) {
+            const el = document.getElementById(selectId);
+            if (!el) return;
+            el.innerHTML = '<option value="">None</option>' +
+                roles.map(r => `<option value="${r.id}" ${r.id === selectedId ? 'selected' : ''}>${r.name}</option>`).join('');
+        }
+
+        // ── Settings ──
+        async function loadGuildSettings() {
+            if (!adminGuildId) return;
+            try {
+                const res = await fetch(`/api/admin/guild/${adminGuildId}/settings`);
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                adminChannels = data.channels || [];
+                adminRoles = data.roles || [];
+
+                // Welcome
+                document.getElementById('welcomeEnabled').checked = data.welcome.enabled || false;
+                document.getElementById('welcomeMessage').value = data.welcome.message || '';
+                document.getElementById('welcomeBg').value = data.welcome.backgroundUrl || '';
+                populateChannelSelect('welcomeChannel', adminChannels, data.welcome.channelId);
+                populateRoleSelect('welcomeVerifiedRole', adminRoles, data.welcome.verifiedRoleId);
+
+                // Ticket
+                populateChannelSelect('ticketSupportChannel', adminChannels, data.ticket.supportChannelId);
+                populateChannelSelect('ticketLogChannel', adminChannels, data.ticket.logChannelId);
+                populateRoleSelect('ticketStaffRole', adminRoles, data.ticket.staffRoleId);
+                document.getElementById('ticketCloseAction').value = data.ticket.closeAction || 'archive';
+
+                // Anti-raid join
+                const join = data.antiraid.join || {};
+                document.getElementById('arJoinEnabled').checked = join.enabled || false;
+                document.getElementById('arJoinMax').value = join.maxJoins || 5;
+                document.getElementById('arJoinWindow').value = Math.round((join.timeWindow || 60000) / 1000);
+                document.getElementById('arJoinAction').value = join.action || 'kick';
+
+                // Anti-raid message
+                const msg = data.antiraid.message || {};
+                document.getElementById('arMsgEnabled').checked = msg.enabled || false;
+                document.getElementById('arMsgMax').value = msg.maxMessages || 8;
+                document.getElementById('arMsgWindow').value = Math.round((msg.timeWindow || 10000) / 1000);
+                document.getElementById('arMsgAction').value = msg.action || 'mute';
+            } catch (err) {
+                console.error('Failed to load guild settings:', err);
+            }
+        }
+
+        async function saveWelcomeSettings() {
+            if (!adminGuildId) return;
+            try {
+                const res = await fetch(`/api/admin/guild/${adminGuildId}/settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        section: 'welcome',
+                        data: {
+                            enabled: document.getElementById('welcomeEnabled').checked,
+                            channelId: document.getElementById('welcomeChannel').value || null,
+                            message: document.getElementById('welcomeMessage').value,
+                            backgroundUrl: document.getElementById('welcomeBg').value || null,
+                            verifiedRoleId: document.getElementById('welcomeVerifiedRole').value || null,
+                        }
+                    })
+                });
+                const d = await res.json();
+                document.getElementById('welcomeSaveResult').innerHTML = res.ok
+                    ? '<span class="text-emerald-400 result-flash">Saved!</span>'
+                    : `<span class="text-red-400">${d.error}</span>`;
+            } catch { document.getElementById('welcomeSaveResult').innerHTML = '<span class="text-red-400">Network error</span>'; }
+        }
+
+        async function saveTicketSettings() {
+            if (!adminGuildId) return;
+            try {
+                const res = await fetch(`/api/admin/guild/${adminGuildId}/settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        section: 'ticket',
+                        data: {
+                            supportChannelId: document.getElementById('ticketSupportChannel').value || null,
+                            logChannelId: document.getElementById('ticketLogChannel').value || null,
+                            staffRoleId: document.getElementById('ticketStaffRole').value || null,
+                            closeAction: document.getElementById('ticketCloseAction').value,
+                        }
+                    })
+                });
+                const d = await res.json();
+                document.getElementById('ticketSaveResult').innerHTML = res.ok
+                    ? '<span class="text-emerald-400 result-flash">Saved!</span>'
+                    : `<span class="text-red-400">${d.error}</span>`;
+            } catch { document.getElementById('ticketSaveResult').innerHTML = '<span class="text-red-400">Network error</span>'; }
+        }
+
+        async function saveAntiraidSettings() {
+            if (!adminGuildId) return;
+            try {
+                const res = await fetch(`/api/admin/guild/${adminGuildId}/settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        section: 'antiraid',
+                        data: {
+                            join: {
+                                enabled: document.getElementById('arJoinEnabled').checked,
+                                maxJoins: parseInt(document.getElementById('arJoinMax').value) || 5,
+                                timeWindow: (parseInt(document.getElementById('arJoinWindow').value) || 60) * 1000,
+                                action: document.getElementById('arJoinAction').value,
+                                timeoutDuration: 600000,
+                            },
+                            message: {
+                                enabled: document.getElementById('arMsgEnabled').checked,
+                                maxMessages: parseInt(document.getElementById('arMsgMax').value) || 8,
+                                timeWindow: (parseInt(document.getElementById('arMsgWindow').value) || 10) * 1000,
+                                action: document.getElementById('arMsgAction').value,
+                                muteDuration: 300000,
+                            }
+                        }
+                    })
+                });
+                const d = await res.json();
+                document.getElementById('antiraidSaveResult').innerHTML = res.ok
+                    ? '<span class="text-emerald-400 result-flash">Saved!</span>'
+                    : `<span class="text-red-400">${d.error}</span>`;
+            } catch { document.getElementById('antiraidSaveResult').innerHTML = '<span class="text-red-400">Network error</span>'; }
+        }
+
+        // ── Listeners ──
+        async function loadGuildListeners() {
+            if (!adminGuildId) return;
+            try {
+                const res = await fetch(`/api/admin/guild/${adminGuildId}/listeners`);
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                const { listeners, validEvents } = data;
+
+                // Populate add-listener event dropdown
+                const eventSelect = document.getElementById('newListenerEvent');
+                const activeEvents = new Set(Object.keys(listeners));
+                eventSelect.innerHTML = '<option value="">Select event...</option>' +
+                    validEvents.filter(e => !activeEvents.has(e))
+                        .map(e => `<option value="${e}">${e}</option>`).join('');
+
+                // Populate channel dropdown
+                populateChannelSelect('newListenerChannel', adminChannels, '');
+
+                // Render active listeners
+                const grid = document.getElementById('listenersGrid');
+                const entries = Object.entries(listeners);
+                document.getElementById('listenerCount').textContent = `${entries.length} active`;
+
+                if (!entries.length) {
+                    grid.innerHTML = '<div class="text-zinc-500 text-sm">No listeners configured. Add one above.</div>';
+                    return;
+                }
+
+                grid.innerHTML = entries.map(([event, cfg]) => {
+                    const channel = adminChannels.find(c => c.id === cfg.channelId);
+                    const channelName = channel ? `#${channel.name}` : cfg.channelId;
+                    return `<div class="listener-card bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex items-center justify-between">
+                        <div class="flex items-center gap-x-4">
+                            <div class="w-10 h-10 rounded-xl bg-violet-600/20 flex items-center justify-center">
+                                <i class="fas fa-satellite-dish text-violet-400 text-sm"></i>
+                            </div>
+                            <div>
+                                <div class="text-white font-medium text-sm">${event}</div>
+                                <div class="text-zinc-500 text-xs mt-0.5">→ ${channelName}</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-x-2">
+                            <span class="text-xs px-2 py-1 rounded-lg ${cfg.enabled ? 'bg-emerald-600/20 text-emerald-400' : 'bg-zinc-700 text-zinc-400'}">${cfg.enabled ? 'Active' : 'Disabled'}</span>
+                            <button onclick="removeListener('${event}')" class="text-red-400 hover:text-red-300 px-2 py-1 rounded-lg hover:bg-red-500/10 transition-colors text-sm" title="Remove">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (err) {
+                console.error('Failed to load listeners:', err);
+                document.getElementById('listenersGrid').innerHTML = '<div class="text-red-400 text-sm">Failed to load listeners</div>';
+            }
+        }
+
+        async function addListener() {
+            if (!adminGuildId) return;
+            const event = document.getElementById('newListenerEvent').value;
+            const channelId = document.getElementById('newListenerChannel').value;
+            if (!event || !channelId) {
+                document.getElementById('listenerAddResult').innerHTML = '<span class="text-red-400">Select an event and channel</span>';
+                return;
+            }
+            try {
+                const res = await fetch(`/api/admin/guild/${adminGuildId}/listeners/${event}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ channelId, enabled: true })
+                });
+                const d = await res.json();
+                if (res.ok) {
+                    document.getElementById('listenerAddResult').innerHTML = '<span class="text-emerald-400 result-flash">Listener added!</span>';
+                    loadGuildListeners();
+                } else {
+                    document.getElementById('listenerAddResult').innerHTML = `<span class="text-red-400">${d.error}</span>`;
+                }
+            } catch { document.getElementById('listenerAddResult').innerHTML = '<span class="text-red-400">Network error</span>'; }
+        }
+
+        async function removeListener(event) {
+            if (!adminGuildId || !confirm(`Remove listener for "${event}"?`)) return;
+            try {
+                const res = await fetch(`/api/admin/guild/${adminGuildId}/listeners/${event}`, { method: 'DELETE' });
+                if (res.ok) loadGuildListeners();
+            } catch {}
+        }
+
+        // ── Warnings ──
+        async function loadGuildWarnings() {
+            if (!adminGuildId) return;
+            try {
+                const res = await fetch(`/api/admin/guild/${adminGuildId}/warnings`);
+                if (!res.ok) throw new Error();
+                const users = await res.json();
+                const grid = document.getElementById('warningsGrid');
+                const totalWarnings = users.reduce((sum, u) => sum + u.warnings.length, 0);
+                document.getElementById('warningCount').textContent = `${totalWarnings} warning${totalWarnings !== 1 ? 's' : ''} across ${users.length} user${users.length !== 1 ? 's' : ''}`;
+
+                if (!users.length) {
+                    grid.innerHTML = '<div class="text-zinc-500 text-sm py-4 text-center">No warnings issued in this server. 🎉</div>';
+                    return;
+                }
+
+                grid.innerHTML = users.map(u => {
+                    const warnsHtml = u.warnings.map(w => {
+                        const date = new Date(w.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                        const time = new Date(w.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                        return `<div class="flex items-start justify-between gap-x-3 py-3 border-b border-zinc-800/50 last:border-0">
+                            <div class="flex items-start gap-x-3">
+                                <div class="w-6 h-6 bg-red-500/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    <span class="text-red-400 text-xs font-bold">${w.index + 1}</span>
+                                </div>
+                                <div>
+                                    <p class="text-zinc-200 text-sm">${escapeHtml(w.reason)}</p>
+                                    <p class="text-zinc-500 text-xs mt-1">
+                                        <i class="fas fa-gavel mr-1"></i>${escapeHtml(w.moderator)}
+                                        <span class="mx-2">•</span>
+                                        <i class="far fa-calendar mr-1"></i>${date} ${time}
+                                    </p>
+                                </div>
+                            </div>
+                            <button onclick="removeWarning('${u.userId}', ${w.index})" class="text-red-400 hover:text-red-300 px-2 py-1 rounded-lg hover:bg-red-500/10 transition-colors text-xs flex-shrink-0" title="Remove warning">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>`;
+                    }).join('');
+
+                    return `<div class="bg-zinc-950 border border-zinc-800 rounded-2xl p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-x-3">
+                                <div class="w-8 h-8 bg-zinc-800 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-user text-zinc-400 text-xs"></i>
+                                </div>
+                                <div>
+                                    <span class="text-white font-medium text-sm">${escapeHtml(u.username)}</span>
+                                    <span class="text-zinc-600 text-xs ml-2">${u.userId}</span>
+                                </div>
+                            </div>
+                            <span class="text-xs font-medium px-2 py-1 rounded-lg ${u.warnings.length >= 3 ? 'bg-red-600/20 text-red-400' : 'bg-amber-600/20 text-amber-400'}">${u.warnings.length} / 3</span>
+                        </div>
+                        ${warnsHtml}
+                    </div>`;
+                }).join('');
+            } catch (err) {
+                console.error('Failed to load warnings:', err);
+                document.getElementById('warningsGrid').innerHTML = '<div class="text-red-400 text-sm">Failed to load warnings</div>';
+            }
+        }
+
+        async function removeWarning(userId, index) {
+            if (!adminGuildId || !confirm('Remove this warning?')) return;
+            try {
+                const res = await fetch(`/api/admin/guild/${adminGuildId}/warnings/${userId}/${index}`, { method: 'DELETE' });
+                if (res.ok) loadGuildWarnings();
+            } catch {}
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
     </script>
 </body>
 </html>

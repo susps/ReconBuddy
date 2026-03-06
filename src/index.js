@@ -670,6 +670,328 @@ dashboardApp.post('/api/stocks/sell', async (req, res) => {
   }
 });
 
+// ─── Admin permission check middleware ─────────────────────────────────
+const ADMIN_PERMISSION = 0x8; // ADMINISTRATOR
+
+function requireGuildAdmin(req, res) {
+  const session = getSession(req);
+  if (!session) { res.status(401).json({ error: 'Not logged in' }); return null; }
+
+  const guildId = req.params.guildId;
+  if (!guildId || !/^\d{17,20}$/.test(guildId)) {
+    res.status(400).json({ error: 'Invalid guild ID' });
+    return null;
+  }
+
+  // Verify bot is in the guild
+  if (!client.guilds.cache.has(guildId)) {
+    res.status(404).json({ error: 'Bot is not in this guild' });
+    return null;
+  }
+
+  // Verify user has ADMINISTRATOR in this guild
+  const userGuild = session.guilds.find(g => g.id === guildId);
+  if (!userGuild || !(parseInt(userGuild.permissions) & ADMIN_PERMISSION)) {
+    res.status(403).json({ error: 'You do not have Administrator permission in this guild' });
+    return null;
+  }
+
+  return session;
+}
+
+// GET /api/admin/guilds — list guilds where user is admin and bot is present
+dashboardApp.get('/api/admin/guilds', (req, res) => {
+  const session = getSession(req);
+  if (!session) return res.status(401).json({ error: 'Not logged in' });
+
+  const botGuildIds = new Set(client.guilds.cache.map(g => g.id));
+  const adminGuilds = session.guilds
+    .filter(g => botGuildIds.has(g.id) && (parseInt(g.permissions) & ADMIN_PERMISSION))
+    .map(g => {
+      const botGuild = client.guilds.cache.get(g.id);
+      return {
+        id: g.id,
+        name: g.name,
+        icon: g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=64` : null,
+        memberCount: botGuild?.memberCount || 0,
+      };
+    });
+
+  res.json(adminGuilds);
+});
+
+// ─── Guild Settings API ───────────────────────────────────────────────
+
+// GET /api/admin/guild/:guildId/settings
+dashboardApp.get('/api/admin/guild/:guildId/settings', async (req, res) => {
+  if (!requireGuildAdmin(req, res)) return;
+  const { guildId } = req.params;
+
+  try {
+    // Welcome config (global)
+    let welcome = {};
+    try {
+      const welcomePath = path.join(__dirname, '..', 'config', 'welcome.json');
+      welcome = JSON.parse(await fs.readFile(welcomePath, 'utf-8'));
+    } catch { /* no config */ }
+
+    // Ticket config (per-guild)
+    let ticket = {};
+    try {
+      const ticketPath = path.join(__dirname, '..', 'data', 'ticketConfig.json');
+      const allTickets = JSON.parse(await fs.readFile(ticketPath, 'utf-8'));
+      ticket = allTickets[guildId] || {};
+    } catch { /* no config */ }
+
+    // Antiraid config (per-guild)
+    let antiraid = {};
+    try {
+      const antiraidPath = path.join(__dirname, '..', 'data', 'antiraid.json');
+      const allAntiraid = JSON.parse(await fs.readFile(antiraidPath, 'utf-8'));
+      antiraid = allAntiraid[guildId] || {};
+    } catch { /* no config */ }
+
+    // Guild channels for dropdowns
+    const guild = client.guilds.cache.get(guildId);
+    const channels = guild?.channels.cache
+      .filter(c => [0, 5, 11, 12, 13, 15].includes(c.type))
+      .map(c => ({ id: c.id, name: c.name, type: c.type })) || [];
+
+    const roles = guild?.roles.cache
+      .filter(r => r.id !== guildId) // exclude @everyone
+      .sort((a, b) => b.position - a.position)
+      .map(r => ({ id: r.id, name: r.name, color: r.hexColor })) || [];
+
+    res.json({ welcome, ticket, antiraid, channels, roles });
+  } catch (err) {
+    log.error('Guild settings fetch error:', err.message);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// PUT /api/admin/guild/:guildId/settings
+dashboardApp.put('/api/admin/guild/:guildId/settings', async (req, res) => {
+  if (!requireGuildAdmin(req, res)) return;
+  const { guildId } = req.params;
+  const { section, data: sectionData } = req.body;
+
+  if (!section || !sectionData || typeof sectionData !== 'object') {
+    return res.status(400).json({ error: 'Missing section or data' });
+  }
+
+  try {
+    if (section === 'welcome') {
+      const welcomePath = path.join(__dirname, '..', 'config', 'welcome.json');
+      let existing = {};
+      try { existing = JSON.parse(await fs.readFile(welcomePath, 'utf-8')); } catch {}
+      const updated = { ...existing, ...sectionData };
+      // Sanitize fields
+      if (typeof updated.enabled !== 'boolean') updated.enabled = false;
+      if (typeof updated.message !== 'string') updated.message = 'Welcome {user} to {server}!';
+      updated.message = updated.message.slice(0, 500);
+      await fs.writeFile(welcomePath, JSON.stringify(updated, null, 2));
+      return res.json({ success: true, data: updated });
+    }
+
+    if (section === 'ticket') {
+      const ticketPath = path.join(__dirname, '..', 'data', 'ticketConfig.json');
+      let all = {};
+      try { all = JSON.parse(await fs.readFile(ticketPath, 'utf-8')); } catch {}
+      all[guildId] = { ...(all[guildId] || {}), ...sectionData };
+      const allowed = ['archive', 'delete'];
+      if (!allowed.includes(all[guildId].closeAction)) all[guildId].closeAction = 'archive';
+      await fs.writeFile(ticketPath, JSON.stringify(all, null, 2));
+      return res.json({ success: true, data: all[guildId] });
+    }
+
+    if (section === 'antiraid') {
+      const antiraidPath = path.join(__dirname, '..', 'data', 'antiraid.json');
+      let all = {};
+      try { all = JSON.parse(await fs.readFile(antiraidPath, 'utf-8')); } catch {}
+      all[guildId] = { ...(all[guildId] || {}), ...sectionData };
+      await fs.writeFile(antiraidPath, JSON.stringify(all, null, 2));
+      return res.json({ success: true, data: all[guildId] });
+    }
+
+    return res.status(400).json({ error: 'Unknown section' });
+  } catch (err) {
+    log.error('Guild settings update error:', err.message);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// ─── Listener Manager API ─────────────────────────────────────────────
+
+// GET /api/admin/guild/:guildId/listeners
+dashboardApp.get('/api/admin/guild/:guildId/listeners', async (req, res) => {
+  if (!requireGuildAdmin(req, res)) return;
+
+  try {
+    const listenersPath = path.join(__dirname, '..', 'listeners.json');
+    let listeners = {};
+    try { listeners = JSON.parse(await fs.readFile(listenersPath, 'utf-8')); } catch {}
+
+    // Provide the valid events list for the UI
+    const validEvents = [
+      'channelCreate','channelDelete','channelUpdate',
+      'guildBanAdd','guildBanRemove',
+      'guildMemberAdd','guildMemberRemove','guildMemberUpdate',
+      'guildUpdate',
+      'inviteCreate','inviteDelete',
+      'messageCreate','messageDelete','messageDeleteBulk','messageUpdate',
+      'messageReactionAdd','messageReactionRemove',
+      'roleCreate','roleDelete','roleUpdate',
+      'voiceStateUpdate',
+      'emojiCreate','emojiDelete','emojiUpdate',
+      'threadCreate','threadDelete','threadUpdate',
+    ];
+
+    res.json({ listeners, validEvents });
+  } catch (err) {
+    log.error('Listener fetch error:', err.message);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// PUT /api/admin/guild/:guildId/listeners/:event
+dashboardApp.put('/api/admin/guild/:guildId/listeners/:event', async (req, res) => {
+  if (!requireGuildAdmin(req, res)) return;
+  const { event } = req.params;
+  const { channelId, enabled } = req.body;
+
+  if (!event || !/^[a-zA-Z]+$/.test(event)) {
+    return res.status(400).json({ error: 'Invalid event name' });
+  }
+
+  try {
+    const listenersPath = path.join(__dirname, '..', 'listeners.json');
+    let listeners = {};
+    try { listeners = JSON.parse(await fs.readFile(listenersPath, 'utf-8')); } catch {}
+
+    if (enabled === false) {
+      delete listeners[event];
+    } else {
+      if (!channelId || !/^\d{17,20}$/.test(channelId)) {
+        return res.status(400).json({ error: 'Invalid channel ID' });
+      }
+      listeners[event] = {
+        channelId,
+        format: '[{timestamp}] {event}: {json}',
+        filters: {},
+        enabled: true,
+      };
+    }
+
+    await fs.writeFile(listenersPath, JSON.stringify(listeners, null, 2));
+    res.json({ success: true, listeners });
+  } catch (err) {
+    log.error('Listener update error:', err.message);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// DELETE /api/admin/guild/:guildId/listeners/:event
+dashboardApp.delete('/api/admin/guild/:guildId/listeners/:event', async (req, res) => {
+  if (!requireGuildAdmin(req, res)) return;
+  const { event } = req.params;
+
+  if (!event || !/^[a-zA-Z]+$/.test(event)) {
+    return res.status(400).json({ error: 'Invalid event name' });
+  }
+
+  try {
+    const listenersPath = path.join(__dirname, '..', 'listeners.json');
+    let listeners = {};
+    try { listeners = JSON.parse(await fs.readFile(listenersPath, 'utf-8')); } catch {}
+
+    delete listeners[event];
+    await fs.writeFile(listenersPath, JSON.stringify(listeners, null, 2));
+    res.json({ success: true, listeners });
+  } catch (err) {
+    log.error('Listener delete error:', err.message);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// ─── Warnings Viewer API ──────────────────────────────────────────────
+
+// GET /api/admin/guild/:guildId/warnings
+dashboardApp.get('/api/admin/guild/:guildId/warnings', async (req, res) => {
+  if (!requireGuildAdmin(req, res)) return;
+  const { guildId } = req.params;
+
+  try {
+    const warningsPath = path.join(__dirname, '..', 'warnings.json');
+    let allWarnings = {};
+    try { allWarnings = JSON.parse(await fs.readFile(warningsPath, 'utf-8')); } catch {}
+
+    // Enrich warnings with username from guild member cache
+    const guild = client.guilds.cache.get(guildId);
+    const result = [];
+
+    for (const [userId, warns] of Object.entries(allWarnings)) {
+      if (!Array.isArray(warns) || warns.length === 0) continue;
+
+      let username = 'Unknown User';
+      try {
+        const member = guild?.members.cache.get(userId);
+        if (member) {
+          username = member.user.tag;
+        } else {
+          const user = await client.users.fetch(userId).catch(() => null);
+          if (user) username = user.tag;
+        }
+      } catch {}
+
+      result.push({
+        userId,
+        username,
+        warnings: warns.map((w, i) => ({
+          index: i,
+          timestamp: w.timestamp,
+          moderator: w.moderator?.tag || 'Unknown',
+          reason: w.reason,
+        })),
+      });
+    }
+
+    res.json(result);
+  } catch (err) {
+    log.error('Warnings fetch error:', err.message);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// DELETE /api/admin/guild/:guildId/warnings/:userId/:index
+dashboardApp.delete('/api/admin/guild/:guildId/warnings/:userId/:index', async (req, res) => {
+  if (!requireGuildAdmin(req, res)) return;
+  const { userId, index } = req.params;
+  const idx = parseInt(index, 10);
+
+  if (!/^\d{17,20}$/.test(userId) || !Number.isInteger(idx) || idx < 0) {
+    return res.status(400).json({ error: 'Invalid parameters' });
+  }
+
+  try {
+    const warningsPath = path.join(__dirname, '..', 'warnings.json');
+    let allWarnings = {};
+    try { allWarnings = JSON.parse(await fs.readFile(warningsPath, 'utf-8')); } catch {}
+
+    if (!allWarnings[userId] || !allWarnings[userId][idx]) {
+      return res.status(404).json({ error: 'Warning not found' });
+    }
+
+    allWarnings[userId].splice(idx, 1);
+    if (allWarnings[userId].length === 0) delete allWarnings[userId];
+
+    await fs.writeFile(warningsPath, JSON.stringify(allWarnings, null, 2));
+    res.json({ success: true });
+  } catch (err) {
+    log.error('Warning delete error:', err.message);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
 dashboardApp.use(express.static(dashboardDir));
 
 dashboardApp.listen(DASHBOARD_PORT, '0.0.0.0', () => {
