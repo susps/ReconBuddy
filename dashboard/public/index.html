@@ -15,6 +15,21 @@
         .stat-card:hover { transform: translateY(-8px); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1); }
         .live-dot { animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .page-section { display: none; }
+        .page-section.active { display: block; }
+        .nav-btn { transition: all 0.15s ease; }
+        .nav-btn.active { background: rgb(99 102 241); color: white; }
+        .casino-card { transition: all 0.3s ease; }
+        .casino-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px -4px rgb(0 0 0 / 0.3); }
+        .reel { font-size: 3rem; animation: reelSpin 0.3s ease-out; }
+        @keyframes reelSpin { 0% { transform: translateY(-20px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+        .result-flash { animation: flashIn 0.4s ease-out; }
+        @keyframes flashIn { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .stock-row { transition: background 0.15s ease; }
+        .stock-row:hover { background: rgb(39 39 42 / 0.6); }
+        .pnl-pos { color: rgb(52 211 153); }
+        .pnl-neg { color: rgb(248 113 113); }
+        .sparkline { display: inline-block; vertical-align: middle; }
     </style>
 </head>
 <body class="bg-zinc-950 text-zinc-200 min-h-screen">
@@ -34,6 +49,27 @@
                     <div class="w-2 h-2 bg-emerald-500 rounded-full live-dot"></div>
                     <span class="text-emerald-400 font-medium">Online</span>
                 </div>
+                <div id="navCasino" class="hidden">
+                    <button onclick="showPage('casino')" id="navCasinoBtn"
+                       class="nav-btn flex items-center gap-x-2 bg-zinc-800 hover:bg-zinc-700 px-5 py-2 rounded-2xl text-sm font-medium text-zinc-200">
+                        <i class="fas fa-dice"></i>
+                        <span>Casino</span>
+                    </button>
+                </div>
+                <div id="navStocks" class="hidden">
+                    <button onclick="showPage('stocks')" id="navStocksBtn"
+                       class="nav-btn flex items-center gap-x-2 bg-zinc-800 hover:bg-zinc-700 px-5 py-2 rounded-2xl text-sm font-medium text-zinc-200">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Stocks</span>
+                    </button>
+                </div>
+                <div id="navDashboard" class="hidden">
+                    <button onclick="showPage('dashboard')" id="navDashboardBtn"
+                       class="nav-btn flex items-center gap-x-2 bg-zinc-800 hover:bg-zinc-700 px-5 py-2 rounded-2xl text-sm font-medium text-zinc-200">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>Dashboard</span>
+                    </button>
+                </div>
                 <div id="navUser">
                     <a href="/auth/login"
                        class="flex items-center gap-x-2 bg-indigo-600 hover:bg-indigo-500 px-5 py-2 rounded-2xl transition-colors text-sm font-medium text-white">
@@ -51,6 +87,255 @@
     </nav>
 
     <div class="max-w-7xl mx-auto px-6 py-8">
+
+        <!-- ═══ Casino Page ═══ -->
+        <div id="casinoPage" class="page-section">
+            <div class="flex justify-between items-end mb-8">
+                <div>
+                    <h2 class="text-4xl font-semibold tracking-tight">Casino</h2>
+                    <p class="text-zinc-400 mt-1">Try your luck — play slots, roulette, jackpot &amp; more</p>
+                </div>
+                <div id="casinoBalance" class="text-sm font-mono bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-2xl">
+                    Balance: <span class="text-emerald-400">$--</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                <!-- Slots -->
+                <div class="casino-card bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+                    <h3 class="text-lg font-semibold flex items-center gap-x-2 mb-4">
+                        <span class="text-2xl">🎰</span> Slots
+                    </h3>
+                    <p class="text-zinc-400 text-sm mb-4">Spin the reels! Match symbols to win big. Bet 1–500 coins.</p>
+                    <div class="flex items-end gap-x-3 mb-4">
+                        <div class="flex-1">
+                            <label class="text-xs text-zinc-500 uppercase tracking-wider">Bet Amount</label>
+                            <input type="number" id="slotsBet" min="1" max="500" value="10"
+                                   class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-violet-500">
+                        </div>
+                        <button onclick="playSlots()" id="slotsBtn"
+                                class="bg-violet-600 hover:bg-violet-500 text-white px-6 py-2 rounded-xl font-medium transition-colors">
+                            Spin
+                        </button>
+                    </div>
+                    <div id="slotsResult" class="bg-black/40 rounded-2xl p-4 text-center min-h-[80px] flex items-center justify-center">
+                        <span class="text-zinc-500 text-sm">Press Spin to play</span>
+                    </div>
+                </div>
+
+                <!-- Roulette -->
+                <div class="casino-card bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+                    <h3 class="text-lg font-semibold flex items-center gap-x-2 mb-4">
+                        <span class="text-2xl">🎲</span> Roulette
+                    </h3>
+                    <p class="text-zinc-400 text-sm mb-4">Bet on red, black, or an exact number (0–36). Up to 100k bet.</p>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="text-xs text-zinc-500 uppercase tracking-wider">Bet Amount</label>
+                            <input type="number" id="rouletteBet" min="1" max="100000" value="50"
+                                   class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-violet-500">
+                        </div>
+                        <div>
+                            <label class="text-xs text-zinc-500 uppercase tracking-wider">Choice</label>
+                            <select id="rouletteChoice" onchange="toggleRouletteNumber()"
+                                    class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-violet-500">
+                                <option value="red">Red</option>
+                                <option value="black">Black</option>
+                                <option value="number">Number</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="rouletteNumberWrap" class="mb-3 hidden">
+                        <label class="text-xs text-zinc-500 uppercase tracking-wider">Number (0–36)</label>
+                        <input type="number" id="rouletteNumber" min="0" max="36" value="0"
+                               class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-violet-500">
+                    </div>
+                    <button onclick="playRoulette()" id="rouletteBtn"
+                            class="w-full bg-violet-600 hover:bg-violet-500 text-white px-6 py-2 rounded-xl font-medium transition-colors mb-4">
+                        Spin the Wheel
+                    </button>
+                    <div id="rouletteResult" class="bg-black/40 rounded-2xl p-4 text-center min-h-[80px] flex items-center justify-center">
+                        <span class="text-zinc-500 text-sm">Place your bet and spin</span>
+                    </div>
+                </div>
+
+                <!-- Coinflip -->
+                <div class="casino-card bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+                    <h3 class="text-lg font-semibold flex items-center gap-x-2 mb-4">
+                        <span class="text-2xl">🪙</span> Coinflip
+                    </h3>
+                    <p class="text-zinc-400 text-sm mb-4">Simple heads or tails — just for fun!</p>
+                    <button onclick="playCoinflip()" id="coinflipBtn"
+                            class="w-full bg-amber-600 hover:bg-amber-500 text-white px-6 py-2 rounded-xl font-medium transition-colors mb-4">
+                        Flip the Coin
+                    </button>
+                    <div id="coinflipResult" class="bg-black/40 rounded-2xl p-4 text-center min-h-[80px] flex items-center justify-center">
+                        <span class="text-zinc-500 text-sm">Press Flip to play</span>
+                    </div>
+                </div>
+
+                <!-- Jackpot -->
+                <div class="casino-card bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+                    <h3 class="text-lg font-semibold flex items-center gap-x-2 mb-4">
+                        <span class="text-2xl">🎟️</span> Jackpot
+                    </h3>
+                    <p class="text-zinc-400 text-sm mb-4">Buy a ticket and hope for the mega jackpot (1000x). Up to 100k bet.</p>
+                    <div class="flex items-end gap-x-3 mb-4">
+                        <div class="flex-1">
+                            <label class="text-xs text-zinc-500 uppercase tracking-wider">Bet Amount</label>
+                            <input type="number" id="jackpotBet" min="1" max="100000" value="100"
+                                   class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-violet-500">
+                        </div>
+                        <button onclick="playJackpot()" id="jackpotBtn"
+                                class="bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-6 py-2 rounded-xl font-medium transition-colors">
+                            Buy Ticket
+                        </button>
+                    </div>
+                    <div id="jackpotResult" class="bg-black/40 rounded-2xl p-4 text-center min-h-[80px] flex items-center justify-center">
+                        <span class="text-zinc-500 text-sm">Buy a ticket to play</span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ═══ Stocks Page ═══ -->
+        <div id="stocksPage" class="page-section">
+            <div class="flex justify-between items-end mb-8">
+                <div>
+                    <h2 class="text-4xl font-semibold tracking-tight">Stock Market</h2>
+                    <p class="text-zinc-400 mt-1">View live prices, buy &amp; sell shares</p>
+                </div>
+                <div class="flex items-center gap-x-3">
+                    <div id="stocksBalance" class="text-sm font-mono bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-2xl">
+                        Balance: <span class="text-emerald-400">$--</span>
+                    </div>
+                    <button onclick="loadStocksPage()" class="bg-zinc-800 hover:bg-zinc-700 px-4 py-2 rounded-2xl text-sm font-medium transition-colors">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Market Overview -->
+                <div class="lg:col-span-8 bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+                    <h3 class="text-lg font-semibold flex items-center gap-x-2 mb-4">
+                        <i class="fas fa-chart-line text-sky-400"></i> Market Overview
+                        <span id="stockCount" class="ml-auto text-xs text-zinc-500 font-mono"></span>
+                    </h3>
+                    <!-- Search and filter -->
+                    <div class="flex flex-wrap gap-3 mb-4">
+                        <input type="text" id="stockSearch" placeholder="Search ticker or name..."
+                               oninput="filterMarketTable()"
+                               class="flex-1 min-w-[160px] bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+                        <select id="sectorFilter" onchange="filterMarketTable()"
+                                class="bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+                            <option value="all">All Sectors</option>
+                            <option value="tech">Technology</option>
+                            <option value="gaming">Gaming</option>
+                            <option value="crypto">Crypto &amp; Blockchain</option>
+                            <option value="finance">Finance</option>
+                            <option value="retail">Retail &amp; Consumer</option>
+                            <option value="energy">Energy</option>
+                            <option value="health">Healthcare</option>
+                            <option value="auto">Automotive &amp; Transport</option>
+                            <option value="space">Space &amp; Defence</option>
+                            <option value="media">Media &amp; Entertainment</option>
+                            <option value="realestate">Real Estate &amp; Telecom</option>
+                            <option value="mining">Mining &amp; Commodities</option>
+                            <option value="travel">Travel &amp; Leisure</option>
+                            <option value="meme">Meme &amp; Speculative</option>
+                        </select>
+                    </div>
+                    <div class="overflow-y-auto max-h-[520px] overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="sticky top-0 bg-zinc-900 z-10">
+                                <tr class="text-zinc-500 text-xs uppercase tracking-wider border-b border-zinc-800">
+                                    <th class="text-left py-3 px-2">Ticker</th>
+                                    <th class="text-left py-3 px-2">Name</th>
+                                    <th class="text-right py-3 px-2">Price</th>
+                                    <th class="text-right py-3 px-2">24h</th>
+                                    <th class="text-center py-3 px-2">Trend</th>
+                                    <th class="text-right py-3 px-2">Volatility</th>
+                                </tr>
+                            </thead>
+                            <tbody id="marketTableBody">
+                                <tr><td colspan="6" class="text-center py-8 text-zinc-500">Loading market data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Trade Panel -->
+                <div class="lg:col-span-4 space-y-6">
+                    <!-- Buy -->
+                    <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+                        <h3 class="text-lg font-semibold flex items-center gap-x-2 mb-4">
+                            <i class="fas fa-arrow-trend-up text-emerald-400"></i> Buy Shares
+                        </h3>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="text-xs text-zinc-500 uppercase tracking-wider">Ticker</label>
+                                <select id="buyTicker" class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-emerald-500">
+                                    <option value="">Loading...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-zinc-500 uppercase tracking-wider">Quantity</label>
+                                <input type="number" id="buyQuantity" min="1" value="1"
+                                       class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-emerald-500">
+                            </div>
+                            <div id="buyCostPreview" class="text-xs text-zinc-500 font-mono"></div>
+                            <button onclick="executeBuy()" id="buyBtn"
+                                    class="w-full bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-xl font-medium transition-colors">
+                                Buy
+                            </button>
+                            <div id="buyResult" class="text-sm text-center min-h-[24px]"></div>
+                        </div>
+                    </div>
+
+                    <!-- Sell -->
+                    <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+                        <h3 class="text-lg font-semibold flex items-center gap-x-2 mb-4">
+                            <i class="fas fa-arrow-trend-down text-red-400"></i> Sell Shares
+                        </h3>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="text-xs text-zinc-500 uppercase tracking-wider">Ticker</label>
+                                <select id="sellTicker" class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-red-500">
+                                    <option value="">Loading...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-zinc-500 uppercase tracking-wider">Quantity</label>
+                                <input type="number" id="sellQuantity" min="1" value="1"
+                                       class="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-red-500">
+                            </div>
+                            <button onclick="executeSell()" id="sellBtn"
+                                    class="w-full bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-xl font-medium transition-colors">
+                                Sell
+                            </button>
+                            <div id="sellResult" class="text-sm text-center min-h-[24px]"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Portfolio -->
+            <div class="mt-6 bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+                <h3 class="text-lg font-semibold flex items-center gap-x-2 mb-4">
+                    <i class="fas fa-briefcase text-amber-400"></i> Your Portfolio
+                    <span id="portfolioTotal" class="ml-auto text-sm font-mono text-emerald-400"></span>
+                </h3>
+                <div id="portfolioGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-[480px] overflow-y-auto">
+                    <div class="text-zinc-500 text-sm">Loading portfolio...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ Dashboard Page ═══ -->
+        <div id="dashboardPage" class="page-section active">
         <div class="flex justify-between items-end mb-8">
             <div>
                 <h2 class="text-4xl font-semibold tracking-tight">Dashboard</h2>
@@ -117,6 +402,8 @@
             </div>
         </div>
 
+        </div><!-- /dashboardPage -->
+
         <!-- Footer -->
         <div class="mt-12 text-center text-zinc-500 text-xs flex flex-col items-center gap-y-4">
             <a href="https://discord.gg/thenexus" target="_blank" rel="noopener noreferrer"
@@ -131,6 +418,377 @@
     <script>
         let statsData = {};
         let uptimeInterval = null;
+        let isLoggedIn = false;
+        let currentPage = 'dashboard';
+
+        // ─── Page navigation ─────────────────────────────────────
+        function showPage(page) {
+            currentPage = page;
+            document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
+            const target = document.getElementById(page + 'Page');
+            if (target) target.classList.add('active');
+            document.getElementById('navCasinoBtn')?.classList.toggle('active', page === 'casino');
+            document.getElementById('navDashboardBtn')?.classList.toggle('active', page === 'dashboard');
+            document.getElementById('navStocksBtn')?.classList.toggle('active', page === 'stocks');
+            if (page === 'casino') refreshCasinoBalance();
+            if (page === 'stocks') loadStocksPage();
+        }
+
+        async function refreshCasinoBalance() {
+            try {
+                const res = await fetch('/api/me');
+                const data = await res.json();
+                if (data.loggedIn && data.economy) {
+                    document.getElementById('casinoBalance').innerHTML =
+                        `Balance: <span class="text-emerald-400">$${data.economy.balance.toLocaleString()}</span>`;
+                }
+            } catch {}
+        }
+
+        function toggleRouletteNumber() {
+            const wrap = document.getElementById('rouletteNumberWrap');
+            wrap.classList.toggle('hidden', document.getElementById('rouletteChoice').value !== 'number');
+        }
+
+        function disableBtn(id, text) {
+            const btn = document.getElementById(id);
+            btn.disabled = true;
+            btn.dataset.origText = btn.textContent;
+            btn.textContent = text || 'Playing...';
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+        function enableBtn(id) {
+            const btn = document.getElementById(id);
+            btn.disabled = false;
+            btn.textContent = btn.dataset.origText || 'Play';
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+        // ─── Casino games ────────────────────────────────────────
+        async function playSlots() {
+            const bet = parseInt(document.getElementById('slotsBet').value, 10);
+            if (!bet || bet < 1 || bet > 500) return;
+            disableBtn('slotsBtn', 'Spinning...');
+            try {
+                const res = await fetch('/api/casino/slots', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bet })
+                });
+                const d = await res.json();
+                if (!res.ok) { document.getElementById('slotsResult').innerHTML = `<span class="text-red-400">${d.error}</span>`; return; }
+                const won = d.payout > 0;
+                document.getElementById('slotsResult').innerHTML = `
+                    <div class="result-flash">
+                        <div class="flex justify-center gap-x-4 mb-3">
+                            <span class="reel">${d.reels[0]}</span>
+                            <span class="reel" style="animation-delay:0.1s">${d.reels[1]}</span>
+                            <span class="reel" style="animation-delay:0.2s">${d.reels[2]}</span>
+                        </div>
+                        <div class="text-lg font-semibold ${won ? 'text-emerald-400' : 'text-red-400'}">
+                            ${won ? `+${d.payout.toLocaleString()} coins!` : 'No match — better luck next time'}
+                        </div>
+                        <div class="text-xs text-zinc-500 mt-1">Balance: $${d.balance.toLocaleString()}</div>
+                    </div>`;
+                refreshCasinoBalance();
+            } catch { document.getElementById('slotsResult').innerHTML = '<span class="text-red-400">Network error</span>'; }
+            finally { enableBtn('slotsBtn'); }
+        }
+
+        async function playRoulette() {
+            const bet = parseInt(document.getElementById('rouletteBet').value, 10);
+            const choice = document.getElementById('rouletteChoice').value;
+            const number = parseInt(document.getElementById('rouletteNumber').value, 10);
+            if (!bet || bet < 1 || bet > 100000) return;
+            disableBtn('rouletteBtn', 'Spinning...');
+            try {
+                const body = { bet, choice };
+                if (choice === 'number') body.number = number;
+                const res = await fetch('/api/casino/roulette', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const d = await res.json();
+                if (!res.ok) { document.getElementById('rouletteResult').innerHTML = `<span class="text-red-400">${d.error}</span>`; return; }
+                const won = d.payout > 0;
+                const colorClass = d.spinColor === 'red' ? 'text-red-400' : d.spinColor === 'green' ? 'text-emerald-400' : 'text-zinc-300';
+                document.getElementById('rouletteResult').innerHTML = `
+                    <div class="result-flash">
+                        <div class="text-3xl font-bold mb-2 ${colorClass}">${d.spin} ${d.spinColor.toUpperCase()}</div>
+                        <div class="text-lg font-semibold ${won ? 'text-emerald-400' : 'text-red-400'}">
+                            ${won ? `+${d.payout.toLocaleString()} coins!` : 'No luck this spin'}
+                        </div>
+                        <div class="text-xs text-zinc-500 mt-1">Balance: $${d.balance.toLocaleString()}</div>
+                    </div>`;
+                refreshCasinoBalance();
+            } catch { document.getElementById('rouletteResult').innerHTML = '<span class="text-red-400">Network error</span>'; }
+            finally { enableBtn('rouletteBtn'); }
+        }
+
+        async function playCoinflip() {
+            disableBtn('coinflipBtn', 'Flipping...');
+            try {
+                const res = await fetch('/api/casino/coinflip', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: '{}'
+                });
+                const d = await res.json();
+                if (!res.ok) { document.getElementById('coinflipResult').innerHTML = `<span class="text-red-400">${d.error}</span>`; return; }
+                const emoji = d.result === 'Heads' ? '👑' : '🪙';
+                document.getElementById('coinflipResult').innerHTML = `
+                    <div class="result-flash">
+                        <div class="text-5xl mb-2">${emoji}</div>
+                        <div class="text-2xl font-bold text-amber-400">${d.result}</div>
+                    </div>`;
+            } catch { document.getElementById('coinflipResult').innerHTML = '<span class="text-red-400">Network error</span>'; }
+            finally { enableBtn('coinflipBtn'); }
+        }
+
+        async function playJackpot() {
+            const bet = parseInt(document.getElementById('jackpotBet').value, 10);
+            if (!bet || bet < 1 || bet > 100000) return;
+            disableBtn('jackpotBtn', 'Rolling...');
+            try {
+                const res = await fetch('/api/casino/jackpot', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bet })
+                });
+                const d = await res.json();
+                if (!res.ok) { document.getElementById('jackpotResult').innerHTML = `<span class="text-red-400">${d.error}</span>`; return; }
+                const won = d.payout > 0;
+                document.getElementById('jackpotResult').innerHTML = `
+                    <div class="result-flash">
+                        <div class="text-3xl font-bold mb-2 ${won ? 'text-fuchsia-400' : 'text-zinc-400'}">Roll: ${d.roll}</div>
+                        <div class="text-lg font-semibold ${won ? 'text-emerald-400' : 'text-red-400'}">
+                            ${won ? `${d.tierName} — +${d.payout.toLocaleString()} coins!` : 'No win this ticket'}
+                        </div>
+                        <div class="text-xs text-zinc-500 mt-1">Balance: $${d.balance.toLocaleString()}</div>
+                    </div>`;
+                refreshCasinoBalance();
+            } catch { document.getElementById('jackpotResult').innerHTML = '<span class="text-red-400">Network error</span>'; }
+            finally { enableBtn('jackpotBtn'); }
+        }
+
+        // ─── Stock market ────────────────────────────────────────
+        let marketCache = [];
+
+        function miniSparkline(history) {
+            if (!history || history.length < 2) return '';
+            const prices = history.map(h => h.price);
+            const min = Math.min(...prices);
+            const max = Math.max(...prices);
+            const range = max - min || 1;
+            const w = 80, h = 24;
+            const points = prices.map((p, i) => {
+                const x = (i / (prices.length - 1)) * w;
+                const y = h - ((p - min) / range) * (h - 4) - 2;
+                return `${x.toFixed(1)},${y.toFixed(1)}`;
+            }).join(' ');
+            const color = prices[prices.length - 1] >= prices[0] ? '#34d399' : '#f87171';
+            return `<svg class="sparkline" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline fill="none" stroke="${color}" stroke-width="1.5" points="${points}"/></svg>`;
+        }
+
+        const STOCK_SECTORS = {
+            NEXI:'tech', TECH:'tech', AAPL:'tech', MSFT:'tech', GGLE:'tech', AMZN:'tech', META:'tech',
+            NVDA:'tech', CHIP:'tech', AIML:'tech', CYBER:'tech', CLOUD:'tech',
+            GME:'gaming', GAME:'gaming', ESPT:'gaming',
+            CRYPTO:'crypto', BITC:'crypto', ETHE:'crypto', BLOCK:'crypto',
+            FINANCE:'finance', BANK:'finance', INSUR:'finance', FINTK:'finance',
+            RETAIL:'retail', LUXE:'retail', FOOD:'retail', BREW:'retail',
+            ENERGY:'energy', OIL:'energy', SOLAR:'energy', NUKE:'energy', WIND:'energy',
+            HEALTH:'health', PHARMA:'health', BIO:'health',
+            AUTO:'auto', ELEC:'auto', AIR:'auto', SHIP:'auto',
+            SPACE:'space', DEFNS:'space', ORBIT:'space',
+            MEDIA:'media', STRM:'media', MUSIC:'media',
+            REIT:'realestate', TELCO:'realestate',
+            MINE:'mining', GOLD:'mining', STEEL:'mining',
+            TRVL:'travel', HOTEL:'travel', CRUIS:'travel',
+            MEME:'meme', MOON:'meme', DOGE:'meme', APE:'meme', YOLO:'meme',
+        };
+
+        async function loadStocksPage() {
+            await Promise.all([loadMarketTable(), loadPortfolio(), refreshStocksBalance()]);
+        }
+
+        async function refreshStocksBalance() {
+            try {
+                const res = await fetch('/api/me');
+                const data = await res.json();
+                if (data.loggedIn && data.economy) {
+                    document.getElementById('stocksBalance').innerHTML =
+                        `Balance: <span class="text-emerald-400">$${data.economy.balance.toLocaleString()}</span>`;
+                }
+            } catch {}
+        }
+
+        async function loadMarketTable() {
+            try {
+                const res = await fetch('/api/stocks/market');
+                const stocks = await res.json();
+                marketCache = stocks;
+                const tbody = document.getElementById('marketTableBody');
+                if (!stocks.length) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-zinc-500">No stocks available</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = stocks.map(s => {
+                    const hist = s.history || [];
+                    let change = '--';
+                    let changeClass = 'text-zinc-500';
+                    if (hist.length >= 2) {
+                        const oldest = hist[0].price;
+                        const pct = ((s.price - oldest) / oldest * 100).toFixed(1);
+                        change = (pct >= 0 ? '+' : '') + pct + '%';
+                        changeClass = pct >= 0 ? 'pnl-pos' : 'pnl-neg';
+                    }
+                    const sector = STOCK_SECTORS[s.ticker] || 'other';
+                    return `<tr class="stock-row border-b border-zinc-800/50" data-sector="${sector}" data-ticker="${s.ticker}" data-name="${s.name}">
+                        <td class="py-3 px-2 font-semibold text-white">${s.ticker}</td>
+                        <td class="py-3 px-2 text-zinc-400">${s.name}</td>
+                        <td class="py-3 px-2 text-right font-mono text-white">$${s.price.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+                        <td class="py-3 px-2 text-right font-mono ${changeClass}">${change}</td>
+                        <td class="py-3 px-2 text-center">${miniSparkline(hist)}</td>
+                        <td class="py-3 px-2 text-right font-mono text-zinc-400">${(s.volatility * 100).toFixed(0)}%</td>
+                    </tr>`;
+                }).join('');
+
+                document.getElementById('stockCount').textContent = `${stocks.length} stocks`;
+                filterMarketTable();
+
+                // Update buy dropdown
+                const buySelect = document.getElementById('buyTicker');
+                buySelect.innerHTML = stocks.map(s => `<option value="${s.ticker}">${s.ticker} — $${s.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</option>`).join('');
+                updateBuyCostPreview();
+            } catch { document.getElementById('marketTableBody').innerHTML = '<tr><td colspan="6" class="text-center py-8 text-red-400">Failed to load market data</td></tr>'; }
+        }
+
+        function filterMarketTable() {
+            const search = (document.getElementById('stockSearch')?.value || '').toLowerCase();
+            const sector = document.getElementById('sectorFilter')?.value || 'all';
+            const rows = document.querySelectorAll('#marketTableBody tr.stock-row');
+            let visible = 0;
+            rows.forEach(row => {
+                const ticker = (row.dataset.ticker || '').toLowerCase();
+                const name = (row.dataset.name || '').toLowerCase();
+                const rowSector = row.dataset.sector || '';
+                const matchSearch = !search || ticker.includes(search) || name.includes(search);
+                const matchSector = sector === 'all' || rowSector === sector;
+                const show = matchSearch && matchSector;
+                row.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+            const countEl = document.getElementById('stockCount');
+            if (countEl && marketCache.length) countEl.textContent = `${visible} / ${marketCache.length} stocks`;
+        }
+
+        async function loadPortfolio() {
+            try {
+                const res = await fetch('/api/stocks/portfolio');
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                const grid = document.getElementById('portfolioGrid');
+                const totalEl = document.getElementById('portfolioTotal');
+
+                // Update sell dropdown
+                const sellSelect = document.getElementById('sellTicker');
+                if (data.stocks.length) {
+                    sellSelect.innerHTML = data.stocks.map(s => `<option value="${s.ticker}">${s.ticker} — ${s.quantity} shares</option>`).join('');
+                } else {
+                    sellSelect.innerHTML = '<option value="">No holdings</option>';
+                }
+
+                totalEl.textContent = `Total: $${data.totalValue.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+
+                if (!data.stocks.length) {
+                    grid.innerHTML = '<div class="text-zinc-500 text-sm">You don\'t own any stocks yet. Buy some above!</div>';
+                    return;
+                }
+                grid.innerHTML = data.stocks.map(s => {
+                    const pnl = ((s.currentPrice - s.buyPrice) / s.buyPrice * 100).toFixed(1);
+                    const pnlClass = pnl >= 0 ? 'pnl-pos' : 'pnl-neg';
+                    const pnlSign = pnl >= 0 ? '+' : '';
+                    return `<div class="bg-zinc-950 border border-zinc-800 rounded-2xl p-4">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="text-lg font-semibold text-white">${s.ticker}</div>
+                            <span class="${pnlClass} text-sm font-mono">${pnlSign}${pnl}%</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <span class="text-zinc-500">Shares</span>
+                                <div class="text-white font-mono">${s.quantity.toLocaleString()}</div>
+                            </div>
+                            <div>
+                                <span class="text-zinc-500">Value</span>
+                                <div class="text-emerald-400 font-mono">$${s.value.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+                            </div>
+                            <div>
+                                <span class="text-zinc-500">Avg Buy</span>
+                                <div class="text-zinc-300 font-mono">$${s.buyPrice.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+                            </div>
+                            <div>
+                                <span class="text-zinc-500">Current</span>
+                                <div class="text-zinc-300 font-mono">$${s.currentPrice.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch { document.getElementById('portfolioGrid').innerHTML = '<div class="text-red-400 text-sm">Failed to load portfolio</div>'; }
+        }
+
+        function updateBuyCostPreview() {
+            const ticker = document.getElementById('buyTicker').value;
+            const qty = parseInt(document.getElementById('buyQuantity').value, 10) || 0;
+            const stock = marketCache.find(s => s.ticker === ticker);
+            const el = document.getElementById('buyCostPreview');
+            if (stock && qty > 0) {
+                el.textContent = `Est. cost: $${(stock.price * qty).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+            } else {
+                el.textContent = '';
+            }
+        }
+
+        // Wire up cost preview updates
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('buyTicker')?.addEventListener('change', updateBuyCostPreview);
+            document.getElementById('buyQuantity')?.addEventListener('input', updateBuyCostPreview);
+        });
+
+        async function executeBuy() {
+            const ticker = document.getElementById('buyTicker').value;
+            const quantity = parseInt(document.getElementById('buyQuantity').value, 10);
+            if (!ticker || !quantity || quantity < 1) return;
+            disableBtn('buyBtn', 'Buying...');
+            try {
+                const res = await fetch('/api/stocks/buy', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ticker, quantity })
+                });
+                const d = await res.json();
+                if (!res.ok) { document.getElementById('buyResult').innerHTML = `<span class="text-red-400">${d.error}</span>`; return; }
+                document.getElementById('buyResult').innerHTML =
+                    `<span class="text-emerald-400 result-flash">Bought ${quantity} ${ticker} for $${d.cost.toLocaleString()}</span>`;
+                loadStocksPage();
+            } catch { document.getElementById('buyResult').innerHTML = '<span class="text-red-400">Network error</span>'; }
+            finally { enableBtn('buyBtn'); }
+        }
+
+        async function executeSell() {
+            const ticker = document.getElementById('sellTicker').value;
+            const quantity = parseInt(document.getElementById('sellQuantity').value, 10);
+            if (!ticker || !quantity || quantity < 1) return;
+            disableBtn('sellBtn', 'Selling...');
+            try {
+                const res = await fetch('/api/stocks/sell', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ticker, quantity })
+                });
+                const d = await res.json();
+                if (!res.ok) { document.getElementById('sellResult').innerHTML = `<span class="text-red-400">${d.error}</span>`; return; }
+                document.getElementById('sellResult').innerHTML =
+                    `<span class="text-emerald-400 result-flash">Sold ${quantity} ${ticker} for $${d.revenue.toLocaleString()}</span>`;
+                loadStocksPage();
+            } catch { document.getElementById('sellResult').innerHTML = '<span class="text-red-400">Network error</span>'; }
+            finally { enableBtn('sellBtn'); }
+        }
 
         function formatUptime(seconds) {
             const h = Math.floor(seconds / 3600);
@@ -234,6 +892,10 @@
                 const navUser = document.getElementById('navUser');
 
                 if (data.loggedIn) {
+                    isLoggedIn = true;
+                    document.getElementById('navCasino').classList.remove('hidden');
+                    document.getElementById('navStocks').classList.remove('hidden');
+                    document.getElementById('navDashboard').classList.remove('hidden');
                     // Build portfolio rows
                     let portfolioHtml = '<span class="text-zinc-500">No stocks</span>';
                     if (data.portfolio?.stocks?.length) {

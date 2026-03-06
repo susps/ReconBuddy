@@ -454,6 +454,222 @@ dashboardApp.get('/api/stats', (req, res) => {
   });
 });
 
+// ─── JSON body parser for casino API ───────────────────────────────────────
+dashboardApp.use(express.json());
+
+// ─── Casino API routes ────────────────────────────────────────────────────
+
+const SLOTS_SYMBOLS = [
+  { emoji: '🍒', name: 'Cherry', payout: 2 },
+  { emoji: '🍋', name: 'Lemon', payout: 3 },
+  { emoji: '🍊', name: 'Orange', payout: 4 },
+  { emoji: '🍇', name: 'Grape', payout: 5 },
+  { emoji: '🔔', name: 'Bell', payout: 10 },
+  { emoji: '💎', name: 'Diamond', payout: 20 },
+];
+
+function requireAuth(req, res) {
+  const session = getSession(req);
+  if (!session) { res.status(401).json({ error: 'Not logged in' }); return null; }
+  return session;
+}
+
+async function getEconFunctions() {
+  const econ = await import('./services/economy.js');
+  return econ;
+}
+
+// POST /api/casino/slots
+dashboardApp.post('/api/casino/slots', async (req, res) => {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  try {
+    const { getUser, removeCoins, addCoins, addToHouse } = await getEconFunctions();
+    const bet = parseInt(req.body.bet, 10);
+    if (!Number.isInteger(bet) || bet < 1 || bet > 500) return res.status(400).json({ error: 'Bet must be 1-500' });
+
+    const user = await getUser(session.user.id, session.user.username);
+    if (user.balance < bet) return res.status(400).json({ error: 'Insufficient balance' });
+
+    await removeCoins(session.user.id, bet);
+    await addToHouse(bet);
+
+    const reel1 = SLOTS_SYMBOLS[Math.floor(Math.random() * SLOTS_SYMBOLS.length)];
+    const reel2 = SLOTS_SYMBOLS[Math.floor(Math.random() * SLOTS_SYMBOLS.length)];
+    const reel3 = SLOTS_SYMBOLS[Math.floor(Math.random() * SLOTS_SYMBOLS.length)];
+
+    let payout = 0;
+    if (reel1.emoji === reel2.emoji && reel2.emoji === reel3.emoji) {
+      payout = bet * reel1.payout * 2;
+    } else if (reel1.emoji === reel2.emoji || reel2.emoji === reel3.emoji || reel1.emoji === reel3.emoji) {
+      payout = bet * reel1.payout;
+    }
+    if (payout > 0) await addCoins(session.user.id, payout);
+
+    const updated = await getUser(session.user.id);
+    res.json({ reels: [reel1.emoji, reel2.emoji, reel3.emoji], payout, bet, balance: updated.balance });
+  } catch (err) { log.error('Casino slots error:', err.message); res.status(500).json({ error: 'Internal error' }); }
+});
+
+// POST /api/casino/roulette
+dashboardApp.post('/api/casino/roulette', async (req, res) => {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  try {
+    const { getUser, removeCoins, addCoins, addToHouse } = await getEconFunctions();
+    const bet = parseInt(req.body.bet, 10);
+    const choice = req.body.choice;
+    const numberChoice = req.body.number != null ? parseInt(req.body.number, 10) : null;
+
+    if (!Number.isInteger(bet) || bet < 1 || bet > 100000) return res.status(400).json({ error: 'Bet must be 1-100,000' });
+    if (!['red', 'black', 'number'].includes(choice)) return res.status(400).json({ error: 'Choice must be red, black, or number' });
+    if (choice === 'number' && (!Number.isInteger(numberChoice) || numberChoice < 0 || numberChoice > 36)) {
+      return res.status(400).json({ error: 'Number must be 0-36' });
+    }
+
+    const user = await getUser(session.user.id, session.user.username);
+    if (user.balance < bet) return res.status(400).json({ error: 'Insufficient balance' });
+
+    await removeCoins(session.user.id, bet);
+    await addToHouse(bet);
+
+    const spin = Math.floor(Math.random() * 37);
+    const spinColor = spin === 0 ? 'green' : (spin % 2 === 0 ? 'black' : 'red');
+
+    let payout = 0;
+    if (choice === 'number') {
+      if (spin === numberChoice) payout = bet * 35;
+    } else {
+      if (spin !== 0 && spinColor === choice) payout = bet * 2;
+    }
+    if (payout > 0) await addCoins(session.user.id, payout);
+
+    const updated = await getUser(session.user.id);
+    res.json({ spin, spinColor, payout, bet, balance: updated.balance });
+  } catch (err) { log.error('Casino roulette error:', err.message); res.status(500).json({ error: 'Internal error' }); }
+});
+
+// POST /api/casino/coinflip
+dashboardApp.post('/api/casino/coinflip', async (req, res) => {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  try {
+    const result = Math.random() < 0.5 ? 'Heads' : 'Tails';
+    res.json({ result });
+  } catch (err) { log.error('Casino coinflip error:', err.message); res.status(500).json({ error: 'Internal error' }); }
+});
+
+// POST /api/casino/jackpot
+dashboardApp.post('/api/casino/jackpot', async (req, res) => {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  try {
+    const { getUser, removeCoins, addCoins, addToHouse } = await getEconFunctions();
+    const bet = parseInt(req.body.bet, 10);
+    if (!Number.isInteger(bet) || bet < 1 || bet > 100000) return res.status(400).json({ error: 'Bet must be 1-100,000' });
+
+    const user = await getUser(session.user.id, session.user.username);
+    if (user.balance < bet) return res.status(400).json({ error: 'Insufficient balance' });
+
+    await removeCoins(session.user.id, bet);
+    await addToHouse(bet);
+
+    const roll = Math.floor(Math.random() * 10000) + 1;
+    let payout = 0, tierName = 'No Win';
+    if (roll === 1)          { payout = bet * 1000; tierName = 'Mega Jackpot'; }
+    else if (roll <= 10)     { payout = bet * 100;  tierName = 'Big Jackpot'; }
+    else if (roll <= 110)    { payout = bet * 10;   tierName = 'Big Win'; }
+    else if (roll <= 1110)   { payout = bet * 2;    tierName = 'Small Win'; }
+
+    if (payout > 0) await addCoins(session.user.id, payout);
+
+    const updated = await getUser(session.user.id);
+    res.json({ roll, tierName, payout, bet, balance: updated.balance });
+  } catch (err) { log.error('Casino jackpot error:', err.message); res.status(500).json({ error: 'Internal error' }); }
+});
+
+// ─── Stock Market API routes ──────────────────────────────────────────────
+
+async function getStockFunctions() {
+  return await import('./services/stockMarket.js');
+}
+
+// GET /api/stocks/market — list all stocks with prices
+dashboardApp.get('/api/stocks/market', async (req, res) => {
+  try {
+    const { getMarket } = await getStockFunctions();
+    const stocks = await getMarket();
+    res.json(stocks.map(s => ({
+      ticker: s.ticker,
+      name: s.name,
+      price: s.price,
+      volatility: s.volatility,
+      history: (s.history || []).map(h => ({ price: h.price, timestamp: h.timestamp })),
+      lastUpdated: s.lastUpdated,
+    })));
+  } catch (err) { log.error('Stocks market error:', err.message); res.status(500).json({ error: 'Internal error' }); }
+});
+
+// GET /api/stocks/portfolio — logged-in user's holdings
+dashboardApp.get('/api/stocks/portfolio', async (req, res) => {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  try {
+    const { getPortfolio, getStock } = await getStockFunctions();
+    const holdings = await getPortfolio(session.user.id);
+    const enriched = [];
+    for (const h of holdings) {
+      const stock = await getStock(h.ticker);
+      const currentPrice = stock ? stock.price : 0;
+      enriched.push({
+        ticker: h.ticker,
+        quantity: h.quantity,
+        buyPrice: h.buyPrice,
+        currentPrice,
+        value: currentPrice * h.quantity,
+      });
+    }
+    const totalValue = enriched.reduce((s, e) => s + e.value, 0);
+    res.json({ stocks: enriched, totalValue });
+  } catch (err) { log.error('Stocks portfolio error:', err.message); res.status(500).json({ error: 'Internal error' }); }
+});
+
+// POST /api/stocks/buy — buy shares
+dashboardApp.post('/api/stocks/buy', async (req, res) => {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  try {
+    const { buyStock } = await getStockFunctions();
+    const ticker = (req.body.ticker || '').toUpperCase().trim();
+    const quantity = parseInt(req.body.quantity, 10);
+    if (!ticker || !Number.isInteger(quantity) || quantity < 1) {
+      return res.status(400).json({ error: 'Invalid ticker or quantity' });
+    }
+    const result = await buyStock(session.user.id, session.user.username, ticker, quantity);
+    res.json({ success: true, cost: result.cost, newBalance: result.newBalance });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/stocks/sell — sell shares
+dashboardApp.post('/api/stocks/sell', async (req, res) => {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  try {
+    const { sellStock } = await getStockFunctions();
+    const ticker = (req.body.ticker || '').toUpperCase().trim();
+    const quantity = parseInt(req.body.quantity, 10);
+    if (!ticker || !Number.isInteger(quantity) || quantity < 1) {
+      return res.status(400).json({ error: 'Invalid ticker or quantity' });
+    }
+    const result = await sellStock(session.user.id, ticker, quantity);
+    res.json({ success: true, revenue: result.revenue, remaining: result.remaining });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 dashboardApp.use(express.static(dashboardDir));
 
 dashboardApp.listen(DASHBOARD_PORT, '0.0.0.0', () => {
